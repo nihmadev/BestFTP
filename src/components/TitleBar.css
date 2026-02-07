@@ -1,0 +1,86 @@
+.titlebar {
+  height: 32px;
+  background: var(--fill-color-control-secondary) !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  border-bottom: 1px solid var(--stroke-color-surface);
+  backdrop-filter: none;
+}
+
+.titlebar-login {
+  background: var(--fill-color-solid-background-base) !important;
+}
+
+.titlebar-dashboard {
+  background: var(--fill-color-control-secondary) !important;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  padding-left: 1px;
+  flex: 1;
+}
+
+.titlebar-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.titlebar-title {
+  font-size: 13px;
+  color: var(--text-color-primary);
+  font-weight: 500;
+}
+
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+}
+
+.titlebar-button {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-color-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+  padding: 0;
+}
+
+.titlebar-button:hover {
+  background: var(--fill-color-subtle-secondary);
+}
+
+.titlebar-button.close:hover {
+  background: #e81123;
+  color: white;
+}
+
+.titlebar-button:active {
+  background: var(--fill-color-subtle-tertiary);
+}
+
+.titlebar-button.close:active {
+  background: #c50f1f;
+}
+
+.titlebar-button svg {
+  pointer-events: none;
+}
+
+.titlebar-controls {
+  -webkit-app-region: no-drag;
+}

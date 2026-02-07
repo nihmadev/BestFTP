@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+@theme {
+    --color-solid-bg: var(--fill-color-solid-background-base);
+    --color-layer-default: var(--fill-color-layer-default);
+    --color-card-default: var(--fill-color-card-default);
+    --color-control-alt: var(--fill-color-control-alt-secondary);
+    --color-control-secondary: var(--fill-color-control-secondary);
+    --color-subtle-secondary: var(--fill-color-subtle-secondary);
+    --color-subtle-tertiary: var(--fill-color-subtle-tertiary);
+    --color-accent-tertiary: var(--fill-color-accent-tertiary);
+    --color-text-box: var(--fill-color-text-box);
+
+    --color-text-primary: var(--text-color-primary);
+    --color-text-secondary: var(--text-color-secondary);
+    --color-text-tertiary: var(--text-color-tertiary);
+
+    --color-accent: var(--accent-fill-rest);
+    --color-accent-hover: var(--accent-fill-hover);
+    --color-accent-pressed: var(--accent-fill-pressed);
+
+    --radius-small: 4px;
+    --radius-medium: 8px;
+    --radius-large: 12px;
+
+    --font-family-base: "Segoe UI Variable", "Segoe UI", sans-serif;
+
+    --spacing-titlebar: 32px;
+}
+
+@layer base {
+    :root {
+        --fill-color-solid-background-base: #f3f3f3;
+        --fill-color-layer-default: #ffffff;
+        --fill-color-card-default: #ffffffb3;
+        --fill-color-control-alt-secondary: #00000006;
+        --fill-color-control-secondary: #f9f9f9;
+        --fill-color-subtle-secondary: #00000015;
+        --fill-color-subtle-tertiary: #00000020;
+        --fill-color-accent-tertiary: #0d948830;
+        --fill-color-text-box: #ffffff;
+
+        --text-color-primary: #000000e4;
+        --text-color-secondary: #00000099;
+        --text-color-tertiary: #00000073;
+
+        --accent-fill-rest: #0d9488;
+        --accent-fill-hover: #0f766e;
+        --accent-fill-pressed: #115e59;
+        --accent-text-code: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --fill-color-solid-background-base: #202020;
+            --fill-color-layer-default: #2c2c2c;
+            --fill-color-card-default: #2c2c2c;
+            --fill-color-control-alt-secondary: #ffffff0d;
+            --fill-color-control-secondary: #2c2c2c;
+            --fill-color-subtle-secondary: #ffffff1a;
+            --fill-color-subtle-tertiary: #ffffff25;
+            --fill-color-accent-tertiary: #2dd4bf40;
+            --fill-color-text-box: #3a3a3a;
+
+            --text-color-primary: #ffffff;
+            --text-color-secondary: #ffffffc5;
+            --text-color-tertiary: #ffffff8b;
+
+            --accent-fill-rest: #2dd4bf;
+            --accent-fill-hover: #14b8a6;
+            --accent-fill-pressed: #0d9488;
+        }
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-drag: none;
+    }
+
+    body {
+        font-family: var(--font-family-base);
+        background-color: var(--fill-color-solid-background-base);
+        color: var(--text-color-primary);
+        font-size: 14px;
+        overflow: hidden;
+        height: 100vh;
+        width: 100vw;
+    }
+
+    input,
+    button {
+        font-family: inherit;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #88888866;
+        border-radius: 5px;
+        border: 4px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: #888888aa;
+    }
+}
+
+@layer utilities {
+    .app-container {
+        padding-top: var(--spacing-titlebar);
+        height: 100vh;
+        width: 100vw;
+    }
+
+    .bg-checkerboard {
+        background-image:
+            linear-gradient(45deg, #252526 25%, transparent 25%),
+            linear-gradient(-45deg, #252526 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #252526 75%),
+            linear-gradient(-45deg, transparent 75%, #252526 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+}
+
+@keyframes indeterminate {
+    0% {
+        left: -30%;
+        width: 30%;
+    }
+
+    50% {
+        left: 40%;
+        width: 40%;
+    }
+
+    100% {
+        left: 100%;
+        width: 30%;
+    }
+}

@@ -1,0 +1,823 @@
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background-color: var(--fill-color-solid-background-base);
+    color: var(--text-color-primary);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Custom Title Bar Area */
+.title-bar {
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    -webkit-app-region: drag;
+    user-select: none;
+}
+
+.title-text {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+/* Main Content Area */
+.main-content {
+    display: flex;
+    overflow: hidden;
+    position: relative;
+    height: 100%;
+}
+
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    background-color: var(--fill-color-layer-default);
+    border-right: 1px solid var(--stroke-color-card-default);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 10px;
+    gap: 4px;
+    transition: transform 0.3s ease;
+    overflow-x: hidden;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+@media (max-width: 1024px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 1000;
+        transform: translateX(-100%);
+        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+}
+
+.sidebar-button {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    border-radius: var(--radius-small);
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    color: var(--text-color-primary);
+    text-align: left;
+    cursor: default;
+    width: 100%;
+}
+
+.sidebar-button:hover {
+    background-color: var(--fill-color-subtle-secondary);
+}
+
+.sidebar-button:active {
+    background-color: var(--fill-color-subtle-tertiary);
+}
+
+.sidebar-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.6;
+    padding: 12px 12px 4px 12px;
+    text-transform: uppercase;
+}
+
+.sidebar-section-subtitle {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.5;
+    padding: 8px 12px 4px 12px;
+    display: flex;
+    align-items: center;
+}
+
+.recent-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.sidebar-button.recent-item {
+    height: 32px;
+    font-size: 13px;
+    gap: 8px;
+}
+
+.quick-access-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Explorer Split View */
+.explorer-split {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: 100%;
+    overflow: hidden;
+    min-width: 0;
+    /* Important for flex children */
+}
+
+@media (max-width: 800px) {
+    .explorer-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+
+    .explorer-pane {
+        border-left: none !important;
+        border-top: 1px solid var(--stroke-color-card-default);
+    }
+
+    .explorer-pane:first-child {
+        border-top: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .explorer-split {
+        grid-template-rows: 1fr;
+    }
+
+    .explorer-pane.hidden {
+        display: none;
+    }
+
+    .explorer-pane {
+        border-top: none !important;
+    }
+}
+
+.explorer-pane {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    padding: 12px;
+    background-color: var(--fill-color-layer-default);
+    border-left: 1px solid var(--stroke-color-card-default);
+    overflow: hidden;
+}
+
+.explorer-pane:first-child {
+    border-left: none;
+}
+
+.explorer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    height: 32px;
+}
+
+.explorer-title {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.explorer-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.action-button {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-small);
+    background: transparent;
+    border: none;
+    color: var(--text-color-primary);
+    cursor: default;
+}
+
+.action-button:hover {
+    background-color: var(--fill-color-subtle-secondary);
+}
+
+.action-button:active {
+    background-color: var(--fill-color-subtle-tertiary);
+}
+
+.mobile-only {
+    display: none !important;
+}
+
+/* Pane toggle button should only show on very small screens (< 600px) */
+.pane-toggle-button {
+    display: none !important;
+    background-color: var(--fill-color-subtle-secondary);
+    border: 1px solid var(--stroke-color-surface);
+    color: var(--text-color-primary);
+    padding: 4px 10px;
+    border-radius: var(--radius-small);
+    font-size: 12px;
+    font-weight: 500;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    cursor: default;
+    transition: all 0.1s ease;
+}
+
+.pane-toggle-button:hover {
+    background-color: var(--fill-color-subtle-tertiary);
+}
+
+.pane-toggle-button:active {
+    transform: scale(0.97);
+}
+
+@media (max-width: 1024px) {
+    .mobile-only {
+        display: flex !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .pane-toggle-button {
+        display: flex !important;
+    }
+}
+
+/* Breadcrumb Bar */
+.breadcrumb-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    /* Inner padding closer to WinUI */
+    margin-bottom: 12px;
+    /* background: var(--fill-color-control-alt-secondary); Optional: C# doesn't strictly have bg on breadcrumb bar unless generic */
+    overflow-x: auto;
+    white-space: nowrap;
+    font-size: 14px;
+    min-height: 32px;
+    border-radius: var(--radius-small);
+}
+
+.breadcrumb-item {
+    cursor: default;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text-color-secondary);
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-item:hover {
+    background-color: var(--fill-color-subtle-secondary);
+    color: var(--text-color-primary);
+}
+
+.breadcrumb-item.current {
+    font-weight: 600;
+    color: var(--text-color-primary);
+}
+
+.breadcrumb-separator {
+    opacity: 0.4;
+    font-size: 10px;
+    /* chevron size */
+    margin: 0 2px;
+}
+
+/* File List */
+.file-list-container {
+    overflow-y: auto;
+    border: 1px solid var(--stroke-color-surface);
+    border-radius: var(--radius-small);
+    background-color: var(--fill-color-control-alt-secondary);
+    /* Slight bg contrast */
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    height: 100%;
+    position: relative;
+    z-index: 1;
+    outline: none;
+}
+
+.file-item {
+    position: relative;
+    z-index: 2;
+}
+
+/* File List Drag and Drop Styles */
+.file-list-container.drag-over {
+    background-color: var(--fill-color-subtle-secondary) !important;
+    border: 2px solid var(--accent-fill-rest) !important;
+    box-shadow: inset 0 0 10px rgba(13, 148, 136, 0.2);
+}
+
+.file-item.drag-over {
+    background-color: var(--accent-fill-rest) !important;
+    color: white !important;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.file-item.drag-over .text-secondary {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Fix for cursor pointer during drag */
+[draggable="true"] {
+    cursor: grab;
+}
+
+[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Grid Layout for List */
+.file-grid-layout {
+    display: grid;
+    /* Column widths are now controlled dynamically via inline styles */
+    align-items: center;
+}
+
+.file-list-header {
+    background-color: var(--fill-color-layer-default);
+    border-bottom: 1px solid var(--stroke-color-surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 32px;
+}
+
+@media (max-width: 500px) {
+
+    .header-cell:nth-child(2),
+    .header-cell:nth-child(3),
+    .file-cell:nth-child(3),
+    .file-cell:nth-child(4) {
+        display: none !important;
+    }
+
+    .file-grid-layout {
+        grid-template-columns: 32px 1fr !important;
+    }
+}
+
+.header-cell {
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    height: 100%;
+    border-right: 1px solid transparent;
+    /* Placeholder for separators */
+    position: relative;
+    color: var(--text-color-primary);
+}
+
+.header-cell-content {
+    flex: 1;
+    text-align: left;
+    min-width: 0;
+    /* Allow text truncation if needed */
+}
+
+.header-cell:first-child {
+    padding: 0;
+    justify-content: center;
+}
+
+.header-cell:hover {
+    background-color: var(--fill-color-subtle-secondary);
+}
+
+.header-separator {
+    position: absolute;
+    right: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background-color: var(--stroke-color-surface);
+    cursor: col-resize;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+.header-separator:hover {
+    background-color: var(--text-color-primary);
+    width: 2px;
+}
+
+.header-separator::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    top: 0;
+    bottom: 0;
+}
+
+.file-item {
+    height: 36px;
+    border-bottom: 1px solid transparent;
+    cursor: default;
+    font-size: 13px;
+    color: var(--text-color-primary);
+}
+
+.file-item:nth-child(even) {
+    background-color: transparent;
+    /* Or zebra striping if desired */
+}
+
+.file-item:hover {
+    background-color: var(--fill-color-subtle-secondary);
+}
+
+.file-item.selected {
+    background-color: var(--fill-color-accent-tertiary);
+    transition: background-color 0.05s ease;
+}
+
+/* Parent directory (..) styling */
+.file-item[data-path]:has(.name-cell:first-of-type) .name-cell {
+    font-weight: 500;
+}
+
+.file-item .name-cell:has-text("..") {
+    opacity: 0.8;
+}
+
+.file-cell {
+    padding: 0 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+}
+
+.file-icon-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.name-cell {
+    padding-left: 0;
+}
+
+.text-secondary {
+    color: var(--text-color-secondary);
+}
+
+/* Status Bar - Removed, now using StatusBar component */
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background-color: var(--fill-color-solid-background-base);
+    border: 1px solid var(--stroke-color-surface);
+    border-radius: var(--radius-small);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 4px;
+    z-index: 1000;
+    min-width: 160px;
+    animation: fadeIn 0.1s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text-color-primary);
+    cursor: default;
+    border-radius: 4px;
+    user-select: none;
+}
+
+.context-menu-item:hover {
+    background-color: var(--fill-color-subtle-secondary);
+}
+
+.context-menu-item.danger:hover {
+    background-color: #c42b1c;
+    color: white;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background-color: var(--stroke-color-surface);
+    margin: 4px 0;
+}
+
+/* Toasts */
+.toast-container {
+    position: fixed;
+    bottom: 40px;
+    right: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: var(--fill-color-solid-background-base);
+    border: 1px solid var(--stroke-color-surface);
+    border-radius: var(--radius-small);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+    animation: slideIn 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast-error {
+    border-left: 4px solid #c42b1c;
+}
+
+.toast-success {
+    border-left: 4px solid #107c10;
+}
+
+.toast-info {
+    border-left: 4px solid var(--accent-fill-rest);
+}
+
+.toast-warning {
+    border-left: 4px solid #ffaa44;
+}
+
+/* Modals */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+    backdrop-filter: blur(2px);
+}
+
+.modal {
+    background-color: var(--fill-color-solid-background-base);
+    border: 1px solid var(--stroke-color-surface);
+    border-radius: var(--radius-medium);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 400px;
+    animation: modalScale 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+@keyframes modalScale {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    padding: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    border-bottom: 1px solid var(--stroke-color-card-default);
+}
+
+.modal-body {
+    padding: 20px 16px;
+    font-size: 14px;
+}
+
+.modal-footer {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background-color: var(--fill-color-layer-default);
+    border-top: 1px solid var(--stroke-color-card-default);
+    border-bottom-left-radius: var(--radius-medium);
+    border-bottom-right-radius: var(--radius-medium);
+}
+
+.modal-input {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: var(--fill-color-subtle-secondary);
+    border: 1px solid var(--stroke-color-surface);
+    border-radius: 4px;
+    color: var(--text-color-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.modal-input:focus {
+    border-color: var(--accent-fill-rest);
+}
+
+.btn-primary {
+    background-color: var(--accent-fill-rest);
+    color: white;
+    border: none;
+    padding: 6px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-fill-hover);
+}
+
+.btn-primary.btn-danger {
+    background-color: #c42b1c;
+}
+
+.btn-primary.btn-danger:hover {
+    background-color: #a82318;
+}
+
+.btn-secondary {
+    background-color: var(--fill-color-subtle-secondary);
+    color: var(--text-color-primary);
+    border: 1px solid var(--stroke-color-surface);
+    padding: 6px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+
+/* Custom Drag Ghost */
+.custom-drag-ghost {
+    pointer-events: none;
+    position: fixed;
+    z-index: 9999;
+    background-color: var(--fill-color-solid-background-base);
+    border: 1px solid var(--stroke-color-surface);
+    border-radius: 4px;
+    padding: 8px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-color-primary);
+    opacity: 0.95;
+    white-space: nowrap;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+.custom-drag-ghost .ghost-icon {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.custom-drag-ghost .ghost-icon img,
+.custom-drag-ghost .ghost-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Drop Overlay - "Drop here to upload" */
+.drop-overlay {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    height: 150px;
+    background-color: var(--fill-color-subtle-secondary);
+    /* In C# it's SystemControlAccentAcrylicElementAccentMediumHighBrush which is often accent colored but transparent. 
+       Let's stick to a visible but subtle overlay, or use accent color if active. */
+    background: rgba(13, 148, 136, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--accent-fill-rest);
+    border-radius: 8px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.drop-overlay.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.drop-overlay-content {
+    text-align: center;
+    color: var(--text-color-primary);
+}
+
+.drop-overlay-icon {
+    font-size: 32px;
+    color: var(--accent-fill-color-default);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.drop-overlay-text {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.drop-overlay-subtext {
+    font-size: 12px;
+    opacity: 0.7;
+    max-width: 90%;
+    margin: 0 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

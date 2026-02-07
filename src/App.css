@@ -1,0 +1,175 @@
+:root {
+  /* Fluent Design tokens (Light Mode) */
+  --fill-color-solid-background-base: #f3f3f3;
+  --fill-color-layer-default: #ffffff;
+  --fill-color-card-default: #ffffffb3;
+  /* with opacity for acrylic feel */
+  --fill-color-control-alt-secondary: #00000006;
+  --fill-color-control-secondary: #f9f9f9;
+  --fill-color-subtle-secondary: #00000015;
+  --fill-color-subtle-tertiary: #00000020;
+  --fill-color-accent-tertiary: #0d948830;
+  --fill-color-text-box: #ffffff;
+
+  --text-color-primary: #000000e4;
+  --text-color-secondary: #00000099;
+  --text-color-tertiary: #00000073;
+
+  --accent-fill-rest: #0d9488;
+  --accent-fill-hover: #0f766e;
+  --accent-fill-pressed: #115e59;
+  --accent-text-code: #ffffff;
+
+  --stroke-color-card-default: #0000000f;
+  --stroke-color-control-strong-default: #00000073;
+  --stroke-color-surface: #75757566;
+
+  --radius-small: 4px;
+  --radius-medium: 8px;
+  --radius-large: 12px;
+
+  --font-family-base: "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-size-caption: 12px;
+  --font-size-body: 14px;
+  --font-size-subtitle: 20px;
+  --font-size-title: 28px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Fluent Design tokens (Dark Mode) */
+    --fill-color-solid-background-base: #202020;
+    --fill-color-layer-default: #2c2c2c;
+    --fill-color-card-default: #2c2c2c;
+    --fill-color-control-alt-secondary: #ffffff0d;
+    --fill-color-control-secondary: #2c2c2c;
+    --fill-color-subtle-secondary: #ffffff1a;
+    --fill-color-subtle-tertiary: #ffffff25;
+    --fill-color-accent-tertiary: #2dd4bf40;
+    --fill-color-text-box: #3a3a3a;
+
+    --text-color-primary: #ffffff;
+    --text-color-secondary: #ffffffc5;
+    --text-color-tertiary: #ffffff8b;
+
+    --accent-fill-rest: #2dd4bf;
+    --accent-fill-hover: #14b8a6;
+    --accent-fill-pressed: #0d9488;
+
+    --stroke-color-card-default: #ffffff12;
+    --stroke-color-control-strong-default: #8b8b8b;
+    --stroke-color-surface: #ffffff12;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+body {
+  font-family: var(--font-family-base);
+  background-color: var(--fill-color-solid-background-base);
+  color: var(--text-color-primary);
+  font-size: var(--font-size-body);
+  overflow: hidden;
+  /* App-like behavior */
+  height: 100vh;
+  width: 100vw;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  padding-top: 32px;
+}
+
+input,
+button {
+  font-family: inherit;
+}
+
+/* Utilities */
+.text-caption {
+  font-size: var(--font-size-caption);
+  color: var(--text-color-secondary);
+}
+
+.text-body {
+  font-size: var(--font-size-body);
+  color: var(--text-color-primary);
+}
+
+.text-subtitle {
+  font-size: var(--font-size-subtitle);
+  font-weight: 600;
+}
+
+.text-title {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.full-height {
+  height: 100%;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Custom Scrollbar for Windows feel */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #88888866;
+  border-radius: 5px;
+  border: 4px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #888888aa;
+}

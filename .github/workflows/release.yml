@@ -1,0 +1,158 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create-release.outputs.result }}
+      release_upload_url: ${{ steps.create-release.outputs.upload_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${{ steps.get_version.outputs.VERSION }}`,
+              name: `BestFTP v${{ steps.get_version.outputs.VERSION }}`,
+              body: 'Release notes for this version',
+              draft: false,
+              prerelease: false
+            })
+            return data.id
+
+  build-tauri:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds - DEB, RPM, AppImage
+          - platform: 'ubuntu-22.04'
+            args: '--bundles deb,rpm,appimage'
+            rust_cache: 'linux'
+            
+          # Windows builds - EXE, MSI
+          - platform: 'windows-latest'
+            args: '--bundles nsis,msi'
+            rust_cache: 'windows'
+            
+          # macOS builds - DMG
+          - platform: 'macos-latest'
+            args: '--bundles dmg'
+            rust_cache: 'macos'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup Node.js with caching
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Install Bun (since your project uses it)
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      # Setup Rust with caching
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+          key: ${{ matrix.rust_cache }}
+
+      # Linux specific dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libayatana-appindicator3-dev
+
+      # Install frontend dependencies with cache
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      # Build the app
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  # Optional: Update release notes after all builds complete
+  finalize-release:
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update release notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              body: `# BestFTP Release
+              
+              ## Downloads
+              
+              ### Windows
+              - **NSIS Installer (.exe)** - Recommended for most users
+              - **MSI Installer (.msi)** - For enterprise deployments
+              
+              ### Linux
+              - **DEB Package (.deb)** - For Debian/Ubuntu based distributions
+              - **RPM Package (.rpm)** - For Fedora/RHEL based distributions
+              - **AppImage (.AppImage)** - Universal Linux package
+              
+              ### macOS
+              - **DMG Image (.dmg)** - For macOS users
+              
+              ## Installation
+              
+              Download the appropriate package for your operating system and follow the standard installation procedure.
+              
+              ## Changelog
+              
+              See commits for detailed changes.`
+            })
