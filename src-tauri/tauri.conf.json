@@ -15,9 +15,9 @@
       "deb",
       "rpm",
       "appimage",
-      "nsis",
       "msi",
-      "dmg"
+      "dmg",
+      "app"
     ],
     "icon": [
       "icons/32x32.png",
@@ -31,7 +31,7 @@
     "copyright": "MIT LICENSE",
     "category": "Utility",
     "shortDescription": "Keep you FTP files always with you",
-    "longDescription": "Tired for 2010s FTP clients? BestFTP is a modern, fast, and user-friendly FTP client built with Tauri and React with all features you need",
+    "longDescription": "Tired for 2010s FTP clients? BestFTP is a modern, fast, and user-friendly FTP client with all features you need",
     "linux": {
       "deb": {
         "depends": []
@@ -45,15 +45,21 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "wix": {
-        "language": []
-      },
-      "nsis": {
-        "installerIcon": "icons/icon.ico",
-        "languages": []
+        "language": [
+          "en-US",
+          "pl-PL"
+        ]
       }
     },
     "macOS": {
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "10.13",
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null,
+      "entitlements": null,
+      "exceptionDomain": "",
+      "files": {},
+      "hardenedRuntime": true
     }
   },
   "app": {

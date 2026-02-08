@@ -1,3 +1,9 @@
+# BestFTP
+
+*"Keep you FTP files always with you"*
+
+*Tired for 2010s FTP clients? BestFTP is a modern, fast, and user-friendly FTP client with all features you need.*
+
 BestFTP is a high-performance, next-generation FTP client designed with a focus on speed, reliability, and a premium user experience. Built using the modern **Tauri** stack, it combines the native performance of **Rust** with the flexibility of **React**.
 
 ![BestFTP Layout](https://img.shields.io/badge/UI-Fluent_Design-0078d4?style=for-the-badge&logo=windows)
@@ -18,46 +24,192 @@ BestFTP is a high-performance, next-generation FTP client designed with a focus 
 
 ## System Architecture
 
-BestFTP follows a modern decoupled architecture using the Tauri framework:
+BestFTP follows a modern decoupled architecture using the Tauri framework with comprehensive separation of concerns:
 
 ### 1. Frontend (The Presentation Layer)
 - **Framework**: React 19 (TypeScript)
 - **Styling**: Tailwind CSS V4 & Custom CSS Modules
 - **State Management**: React Hooks (State/Ref/Callback) & Zustand
 - **Icons**: Lucide React
-- **Key Components**:
-    - `Dashboard`: The central hub managing the dual-pane layout.
-    - `FileList`: High-performance file explorer component with sorting and context menu support.
-    - `useFileSystem`: A custom hook orchestrating synchronization between local and remote states.
+- **Build Tool**: Vite
+- **Key Pages**:
+  - `Dashboard`: The main application interface with dual-pane layout
+  - `Login`: Authentication and connection setup interface
+
+- **Core Components**:
+  - `TitleBar`: Custom window frame with system controls
+  - `FileList`: High-performance file explorer with sorting, filtering, and context menus
+  - `Pane`: Container component for local/remote file system views
+  - `Breadcrumbs`: Navigation path display and interaction
+  - `ContextMenu`: Right-click context menus for file operations
+  - `Dialogs`: Modal dialogs for various operations (rename, delete, etc.)
+  - `EditorDialog`: Integrated Monaco Editor for file editing
+  - `VideoViewer`: Built-in media player for video content
+  - `Sidebar`: Quick access and navigation panel
+  - `StatusBar`: Connection status and transfer progress
+  - `ToastList`: Notification system
+  - `DragGhost`: Visual feedback during drag-and-drop operations
+  - `DropOverlay`: Drop zone indicators
+
+- **Custom Hooks**:
+  - `useFileSystem`: Core hook orchestrating local/remote state synchronization
+  - `useFileOperations`: File manipulation operations (copy, move, delete)
+  - `useDashboardDragDrop`: Drag-and-drop functionality
+  - `useDashboardContextMenu`: Context menu management
+  - `useDashboardColumnResize`: Resizable column layout
+  - `useKeybindings`: Keyboard shortcuts and hotkeys
+  - `useToasts`: Toast notification management
+  - `useTransferQueue`: Background transfer queue management
+
+- **Utilities & Libraries**:
+  - `tauri-api.ts`: Tauri command wrappers and type definitions
+  - `api.ts`: HTTP API utilities
+  - `fileIcons.tsx`: File type icon mapping
+  - `themes/`: Custom theme system including Monaco editor themes
+  - `symbol-icon-theme.json`: VS Code symbol icon theme
 
 ### 2. Backend (The Logic Layer)
 - **Runtime**: Tauri V2 (Rust)
-- **FTP Engine**: `suppaftp` (Async) providing robust protocol implementation.
-- **Concurrency**: `tokio` for non-blocking I/O operations.
-- **Process Management**: `spawn_blocking` for heavy filesystem tasks to keep the UI fluid.
-- **Modules**:
-    - `commands.rs`: The RPC bridge handling frontend requests.
-    - `reconnect.rs`: Logic for maintaining persistent connections.
-    - `models.rs`: Type-safe data structures synchronized with the TypeScript frontend.
+- **FTP Engine**: `suppaftp` (Async) providing robust protocol implementation
+- **Concurrency**: `tokio` for non-blocking I/O operations
+- **Process Management**: `spawn_blocking` for heavy filesystem tasks
+- **Core Modules**:
+  - `main.rs`: Application entry point and window setup
+  - `lib.rs`: Core library initialization
+  - `models.rs`: Type-safe data structures synchronized with TypeScript
+  - `reconnect.rs`: Connection persistence and auto-reconnect logic
+  - `utils.rs`: Shared utility functions
 
-### 3. Communication Bridge (RPC)
-BestFTP uses Tauri's secure inter-process communication (IPC) to bridge the frontend and backend. 
-- **Invoke Pattern**: React calls Rust commands using `@tauri-apps/api/core`.
-- **CommandResult**: A unified response pattern ensuring consistent error handling across the app.
+- **Command System** (RPC Bridge):
+  - `commands/mod.rs`: Command registry and routing
+  - `commands/connection.rs`: FTP connection management
+  - `commands/system.rs`: System information and PowerShell integration
+  - `commands/common.rs`: Shared command utilities
+
+- **File System Operations**:
+  - `commands/fs/mod.rs`: File system command coordinator
+  - `commands/fs/listing.rs`: Directory listing and metadata
+  - `commands/fs/manipulation.rs`: File operations (create, delete, rename)
+  - `commands/fs/config.rs`: Configuration management
+
+- **Transfer Engine**:
+  - `commands/transfer/mod.rs`: Transfer operation coordinator
+  - `commands/transfer/upload.rs`: File upload with progress tracking
+  - `commands/transfer/download.rs`: File download with resume support
+  - `commands/transfer/move_op.rs`: Remote file move operations
+  - `commands/transfer/progress.rs`: Real-time progress reporting
+  - `commands/transfer/io.rs`: Low-level I/O operations
+
+### 3. Communication Bridge (IPC)
+BestFTP uses Tauri's secure inter-process communication (IPC) to bridge the frontend and backend:
+- **Invoke Pattern**: React calls Rust commands using `@tauri-apps/api/core`
+- **CommandResult**: Unified response pattern with consistent error handling
+- **Async Operations**: Non-blocking commands with progress callbacks
+- **Type Safety**: Shared TypeScript definitions generated from Rust models
+
+### 4. Security & Capabilities
+- **CSP Policy**: Content Security Policy for secure resource loading
+- **Asset Protocol**: Controlled access to local and remote assets
+- **Capabilities**: Fine-grained permission system via `default.json`
+- **Sandboxing**: Isolated runtime environment for safe operations
+
+---
+
+## Architecture Tree View
+
+```
+BestFTP/
+├── Frontend (React + TypeScript)
+│   ├── Pages/
+│   │   ├── Dashboard.tsx          # Main application interface
+│   │   └── Login.tsx              # Authentication screen
+│   ├── Components/
+│   │   ├── TitleBar.tsx          # Custom window frame
+│   │   └── Dashboard/
+│   │       ├── FileList.tsx      # File explorer component
+│   │       ├── Pane.tsx          # Local/remote container
+│   │       ├── Breadcrumbs.tsx   # Navigation path
+│   │       ├── ContextMenu.tsx    # Right-click menus
+│   │       ├── Dialogs.tsx        # Modal dialogs
+│   │       ├── EditorDialog.tsx   # Monaco editor integration
+│   │       ├── VideoViewer.tsx    # Media player
+│   │       ├── Sidebar.tsx        # Quick navigation
+│   │       ├── StatusBar.tsx      # Status & progress
+│   │       ├── ToastList.tsx      # Notifications
+│   │       ├── DragGhost.tsx      # Drag visual feedback
+│   │       └── DropOverlay.tsx    # Drop zone indicators
+│   ├── Hooks/
+│   │   ├── useFileSystem.ts      # Core state management
+│   │   ├── useFileOperations.ts   # File operations
+│   │   ├── useDashboardDragDrop.ts # Drag & drop
+│   │   ├── useDashboardContextMenu.ts # Context menus
+│   │   ├── useDashboardColumnResize.ts # Resizable columns
+│   │   ├── useKeybindings.ts      # Keyboard shortcuts
+│   │   ├── useToasts.ts          # Toast notifications
+│   │   └── useTransferQueue.ts    # Transfer management
+│   ├── Utils/
+│   │   ├── api.ts                 # HTTP utilities
+│   │   ├── fileIcons.tsx          # File type icons
+│   │   └── symbol-icon-theme.json # VS Code icons
+│   ├── Themes/
+│   │   ├── index.ts               # Theme system
+│   │   └── monaco-themes.ts       # Editor themes
+│   └── Lib/
+│       └── tauri-api.ts          # Tauri command wrappers
+│
+├── Backend (Rust + Tauri)
+│   ├── main.rs                    # Application entry point
+│   ├── lib.rs                     # Core initialization
+│   ├── models.rs                  # Shared data structures
+│   ├── reconnect.rs               # Connection management
+│   ├── utils.rs                   # Utility functions
+│   └── Commands/
+│       ├── mod.rs                 # Command registry
+│       ├── connection.rs          # FTP connections
+│       ├── system.rs              # System integration
+│       ├── common.rs              # Shared utilities
+│       ├── fs/
+│       │   ├── mod.rs             # File system coordinator
+│       │   ├── listing.rs         # Directory listings
+│       │   ├── manipulation.rs    # File operations
+│       │   └── config.rs          # Configuration
+│       └── transfer/
+│           ├── mod.rs             # Transfer coordinator
+│           ├── upload.rs          # File uploads
+│           ├── download.rs        # File downloads
+│           ├── move_op.rs         # Remote moves
+│           ├── progress.rs        # Progress tracking
+│           └── io.ts              # Low-level I/O
+│
+└── Configuration & Build
+    ├── src-tauri/
+    │   ├── tauri.conf.json        # Tauri configuration
+    │   ├── Cargo.toml             # Rust dependencies
+    │   └── capabilities/
+    │       └── default.json        # Security permissions
+    ├── package.json               # Node.js dependencies
+    ├── vite.config.ts             # Vite build config
+    └── tsconfig.json              # TypeScript config
+```
 
 ---
 
 ## Tech Stack
 
-| Component | Technology |
-| :--- | :--- |
-| **Core** | [Tauri](https://tauri.app/) |
-| **Frontend** | [React](https://reactjs.org/) |
-| **Backend Logic** | [Rust](https://www.rust-lang.org/) |
-| **Styling** | [Tailwind CSS](https://tailwindcss.com/) |
-| **Editor** | [Monaco Editor](https://microsoft.github.io/monaco-editor/) |
-| **Icons** | [Lucide](https://lucide.dev/) |
-| **Build Tool** | [Vite](https://vitejs.dev/) |
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Core Framework** | [Tauri](https://tauri.app/) | Cross-platform desktop app framework |
+| **Frontend** | [React](https://reactjs.org/) 19 | UI framework with TypeScript |
+| **Backend Logic** | [Rust](https://www.rust-lang.org/) | High-performance systems programming |
+| **FTP Engine** | [suppaftp](https://github.com/boltless-productions/suppaftp) | Async FTP client implementation |
+| **Async Runtime** | [Tokio](https://tokio.rs/) | Asynchronous I/O and concurrency |
+| **Styling** | [Tailwind CSS](https://tailwindcss.com/) V4 | Utility-first CSS framework |
+| **Code Editor** | [Monaco Editor](https://microsoft.github.io/monaco-editor/) | VS Code editor engine |
+| **Icons** | [Lucide](https://lucide.dev/) | Modern icon library |
+| **Build Tool** | [Vite](https://vitejs.dev/) | Fast development build tool |
+| **Package Manager** | [Bun](https://bun.sh/) | Fast package manager and runtime |
+| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) | Lightweight state management |
+| **Type Safety** | TypeScript | Static type checking across frontend/backend |
 
 ---
 
