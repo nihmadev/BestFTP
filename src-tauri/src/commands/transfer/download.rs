@@ -5,10 +5,11 @@ use std::time::Instant;
 use suppaftp::AsyncFtpStream;
 use futures_lite::io::AsyncReadExt;
 
-use crate::models::{FtpState, CommandResult};
+use crate::models::{FtpState, CommandResult, ConnectionProtocol};
 use crate::utils::parse_ftp_list_line;
 use super::progress::ProgressReader;
 use crate::commands::common::{normalize_remote_path, get_or_reconnect_stream};
+use crate::commands::common::sftp_helper::get_or_create_sftp_client;
 
 pub async fn download_recursive(
     stream: &mut AsyncFtpStream,
@@ -92,48 +93,76 @@ pub async fn download_file(
     local_path: String,
 ) -> Result<CommandResult<()>, String> {
     let normalized_remote_path = normalize_remote_path(&remote_path);
+    let conn_info_guard = state.connection_info.lock().await;
+    let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+    drop(conn_info_guard);
     
-    if let Err(e) = get_or_reconnect_stream(&state).await {
-        return Ok(CommandResult {
-            success: false,
-            data: None,
-            error: Some(e),
-        });
-    }
-    
-    let mut client_guard = state.client.lock().await;
-    if let Some(stream) = client_guard.as_mut() {
-        match download_recursive(stream, &normalized_remote_path, Path::new(&local_path), &app).await {
-            Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
-            Err(e) => {
-                drop(client_guard);
-                
-                if get_or_reconnect_stream(&state).await.is_ok() {
-                    let mut retry_guard = state.client.lock().await;
-                    if let Some(retry_stream) = retry_guard.as_mut() {
-                        match download_recursive(retry_stream, &normalized_remote_path, Path::new(&local_path), &app).await {
-                            Ok(_) => {
-                                return Ok(CommandResult { success: true, data: None, error: None });
-                            },
-                            Err(retry_err) => {
-                                return Ok(CommandResult {
-                                    success: false,
-                                    data: None,
-                                    error: Some(format!("Failed to download after reconnect: {}", retry_err)),
-                                });
-                            }
-                        }
+    match protocol {
+        Some(ConnectionProtocol::SFTP) => {
+            match get_or_create_sftp_client(&state).await {
+                Ok(sftp_client) => {
+                    match sftp_client.download_file(&normalized_remote_path, &local_path) {
+                        Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                        Err(e) => Ok(CommandResult {
+                            success: false,
+                            data: None,
+                            error: Some(format!("Failed to download via SFTP: {}", e)),
+                        })
                     }
+                },
+                Err(e) => {
+                    Ok(CommandResult {
+                        success: false,
+                        data: None,
+                        error: Some(format!("Failed to connect SFTP for download: {}", e)),
+                    })
                 }
-                
-                Ok(CommandResult {
-                    success: false,
-                    data: None,
-                    error: Some(format!("Failed to download: {}", e)),
-                })
             }
         }
-    } else {
-        Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+        Some(ConnectionProtocol::FTP) | None => {
+            if let Err(e) = get_or_reconnect_stream(&state).await {
+                return Ok(CommandResult {
+                    success: false,
+                    data: None,
+                    error: Some(e),
+                });
+            }
+            
+            let mut client_guard = state.ftp_client.lock().await;
+            if let Some(stream) = client_guard.as_mut() {
+                match download_recursive(stream, &normalized_remote_path, Path::new(&local_path), &app).await {
+                    Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                    Err(e) => {
+                        drop(client_guard);
+                        
+                        if get_or_reconnect_stream(&state).await.is_ok() {
+                            let mut retry_guard = state.ftp_client.lock().await;
+                            if let Some(retry_stream) = retry_guard.as_mut() {
+                                match download_recursive(retry_stream, &normalized_remote_path, Path::new(&local_path), &app).await {
+                                    Ok(_) => {
+                                        return Ok(CommandResult { success: true, data: None, error: None });
+                                    },
+                                    Err(retry_err) => {
+                                        return Ok(CommandResult {
+                                            success: false,
+                                            data: None,
+                                            error: Some(format!("Failed to download after reconnect: {}", retry_err)),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Ok(CommandResult {
+                            success: false,
+                            data: None,
+                            error: Some(format!("Failed to download: {}", e)),
+                        })
+                    }
+                }
+            } else {
+                Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+            }
+        }
     }
 }

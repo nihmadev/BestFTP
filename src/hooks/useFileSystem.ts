@@ -9,8 +9,8 @@ export function useFileSystem(addToast: (msg: string, type?: any) => void) {
     const [remoteFiles, setRemoteFiles] = useState<FileItem[]>([]);
     const [recentFolders, setRecentFolders] = useState<RecentFolder[]>([]);
 
-    const [localLoading, setLocalLoading] = useState(false);
-    const [remoteLoading, setRemoteLoading] = useState(false);
+    const [localLoading, setLocalLoading] = useState<boolean | string>(false);
+    const [remoteLoading, setRemoteLoading] = useState<boolean | string>(false);
 
     const [localHistory, setLocalHistory] = useState<string[]>([]);
     const [localHistoryIndex, setLocalHistoryIndex] = useState<number>(-1);
@@ -249,6 +249,7 @@ export function useFileSystem(addToast: (msg: string, type?: any) => void) {
         localFiles, remoteFiles,
         recentFolders,
         localLoading, remoteLoading,
+        setLocalLoading, setRemoteLoading,
         localBreadcrumbs, remoteBreadcrumbs,
         localHistoryIndex, remoteHistoryIndex,
         localHistory, remoteHistory,

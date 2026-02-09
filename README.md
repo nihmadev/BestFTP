@@ -1,15 +1,18 @@
 # BestFTP
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nihmadev/bestftp/main/public/icons/icon.png" alt="BestFTP Banner"
+  height="128" width="128" />
+</div>
 
-*"Keep you FTP files always with you"*
+**Tired for 2010s FTP clients? BestFTP is a modern, fast, and user-friendly FTP client with all features you need.**
 
-*Tired for 2010s FTP clients? BestFTP is a modern, fast, and user-friendly FTP client with all features you need.*
-
-BestFTP is a high-performance, next-generation FTP client designed with a focus on speed, reliability, and a premium user experience. Built using the modern **Tauri** stack, it combines the native performance of **Rust** with the flexibility of **React**.
+BestFTP is a high-performance, next-generation FTP client designed with a focus on speed, reliability, and a premium user experience. Built using the **Tauri** stack, it combines the native performance of **Rust** with the flexibility of **React**.
 
 ![BestFTP Layout](https://img.shields.io/badge/UI-Fluent_Design-0078d4?style=for-the-badge&logo=windows)
 ![Tech Stack](https://img.shields.io/badge/Stack-Tauri_|_React_|_Rust-ff69b4?style=for-the-badge)
-
-## Key Features
+![License](https://img.shields.io/badge/License-MIT-red?style=for-the-badge)
+-------------
+![Key Features](https://img.shields.io/badge/Features-12-blue?style=for-the-badge)
 
 - **Native Performance**: Leverages Rust's speed for file operations and network communication.
 - **Dual-Pane Interface**: Traditional yet modernized side-by-side view for local and remote file systems.
@@ -22,9 +25,7 @@ BestFTP is a high-performance, next-generation FTP client designed with a focus 
 
 ---
 
-## System Architecture
-
-BestFTP follows a modern decoupled architecture using the Tauri framework with comprehensive separation of concerns:
+## ![System Architecture](https://img.shields.io/badge/Architecture-Decoupled-blue?style=for-the-badge)
 
 ### 1. Frontend (The Presentation Layer)
 - **Framework**: React 19 (TypeScript)
@@ -115,7 +116,7 @@ BestFTP uses Tauri's secure inter-process communication (IPC) to bridge the fron
 
 ---
 
-## Architecture Tree View
+## ![Architecture](https://img.shields.io/badge/Architecture-Tree-blue?style=for-the-badge)
 
 ```
 BestFTP/
@@ -196,6 +197,7 @@ BestFTP/
 
 ## Tech Stack
 
+
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
 | **Core Framework** | [Tauri](https://tauri.app/) | Cross-platform desktop app framework |
@@ -264,6 +266,14 @@ BestFTP/
    ```
 
 ---
+<div align="center">
+<img src="https://raw.githubusercontent.com/nihmadev/bestftp/main/public/icons/icon.png" alt="BestFTP Banner"
+height="128" width="128" />
+
+<div align="center">
+
+
+**[Back to top](#bestftp)**
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.

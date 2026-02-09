@@ -31,9 +31,21 @@ export const useDashboardContextMenu = (
                 setContextMenu(null);
             }
         };
+        
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && contextMenu) {
+                setContextMenu(null);
+            }
+        };
+        
         document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+        document.addEventListener("keydown", handleKeyDown);
+        
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [contextMenu]);
 
     const onFileContextMenu = useCallback((e: React.MouseEvent, file: FileItem, isRemote: boolean) => {
         e.preventDefault();

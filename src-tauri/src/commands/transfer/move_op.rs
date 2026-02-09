@@ -26,7 +26,7 @@ pub async fn move_file(
             });
         }
         
-        let mut client_guard = state.client.lock().await;
+        let mut client_guard = state.ftp_client.lock().await;
         if let Some(stream) = client_guard.as_mut() {
             match download_recursive(stream, &normalized_source_path, Path::new(&dest_path), &app).await {
                 Ok(_) => {
@@ -60,7 +60,7 @@ pub async fn move_file(
             });
         }
         
-        let mut client_guard = state.client.lock().await;
+        let mut client_guard = state.ftp_client.lock().await;
         if let Some(stream) = client_guard.as_mut() {
             match upload_recursive(stream, Path::new(&source_path), &normalized_dest_path, &app).await {
                 Ok(_) => {

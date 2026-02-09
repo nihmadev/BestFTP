@@ -14,8 +14,6 @@ export function useTransferQueue() {
     const [queue, setQueue] = useState<TransferItem[]>([]);
     const queueRef = useRef<TransferItem[]>([]);
     const [currentTransfer, setCurrentTransfer] = useState<TransferItem | null>(null);
-
-    // Listen for delete progress events from Tauri
     useEffect(() => {
         let unlisten: (() => void) | undefined;
 
@@ -23,7 +21,6 @@ export function useTransferQueue() {
             try {
                 unlisten = await ftp.onDeleteProgress((event) => {
                     const payload = event.payload;
-                    // Find the current delete transfer and update its progress
                     setCurrentTransfer(prev => {
                         if (prev && prev.fileName.includes('Deleting') && payload.progress >= 0) {
                             return {
@@ -34,8 +31,6 @@ export function useTransferQueue() {
                         }
                         return prev;
                     });
-
-                    // Also update queue
                     setQueue(prev => prev.map(item => {
                         if (item.fileName.includes('Deleting') && item.status === 'transferring') {
                             return {
@@ -89,14 +84,10 @@ export function useTransferQueue() {
         updateQueue(prev => prev.map(item =>
             item.id === id ? { ...item, status: 'transferring' as const } : item
         ));
-
-        // Use ref to find item as state might be stale in closure
         const item = queueRef.current.find(t => t.id === id);
         if (item) {
             setCurrentTransfer({ ...item, status: 'transferring' });
         }
-        
-        // Also ensure currentTransfer is set by checking queue state
         setTimeout(() => {
             const queueItem = queueRef.current.find(t => t.id === id && t.status === 'transferring');
             if (queueItem) {
@@ -150,16 +141,12 @@ export function useTransferQueue() {
         setQueue(prev => prev.map(item =>
             item.id === id ? { ...item, status, progress: 100, error } : item
         ));
-
-        // Update currentTransfer to show 100% before clearing
         setCurrentTransfer(prev => {
             if (prev?.id === id) {
                 return { ...prev, progress: 100 };
             }
             return prev;
         });
-
-        // Delay clearing current transfer to allow user to see 100%
         setTimeout(() => {
             setCurrentTransfer(prev => prev?.id === id ? null : prev);
         }, 1000);

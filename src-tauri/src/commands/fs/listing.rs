@@ -1,111 +1,179 @@
 use tauri::State;
 use std::path::Path;
 use chrono::{DateTime, Utc};
-use crate::models::{FtpState, FileItem, RecentFolder, CommandResult};
+use crate::models::{FtpState, FileItem, RecentFolder, CommandResult, ConnectionProtocol};
 use crate::utils::{format_bytes, parse_ftp_list_line};
 use crate::commands::common::{normalize_remote_path, get_or_reconnect_stream};
+use crate::commands::common::sftp_helper::get_or_create_sftp_client;
+
 
 #[tauri::command]
 pub async fn list_remote_files(state: State<'_, FtpState>, path: String) -> Result<CommandResult<Vec<FileItem>>, String> {
     let normalized_path = normalize_remote_path(&path);
+    let conn_info_guard = state.connection_info.lock().await;
+    let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+    drop(conn_info_guard);
     
-    if let Err(e) = get_or_reconnect_stream(&state).await {
-        return Ok(CommandResult {
-            success: false,
-            data: None,
-            error: Some(e),
-        });
-    }
-    
-    let mut client_guard = state.client.lock().await;
-    
-    if let Some(stream) = client_guard.as_mut() {
-        match stream.mlsd(Some(&normalized_path)).await {
-            Ok(files) => {
-                let mut items = Vec::new();
-                for file_str in files {
-                    if let Some((name, size, is_directory, date_str, permissions)) = parse_ftp_list_line(&file_str) {
-                         items.push(FileItem {
-                            name: name.clone(),
-                            full_path: if normalized_path == "/" { format!("/{}", name) } else { format!("{}/{}", normalized_path.trim_end_matches('/'), name) }, 
-                            size,
-                            modified: None,
-                            is_directory,
-                            readable_size: if is_directory { "".to_string() } else { format_bytes(size) },
-                            readable_modified: date_str,
-                            permissions,
-                        });
+    match protocol {
+        Some(ConnectionProtocol::SFTP) => {
+            match get_or_create_sftp_client(&state).await {
+                Ok(sftp_client) => {
+                    match sftp_client.list_directory(&normalized_path) {
+                        Ok(items) => {
+                            let mut path_guard = state.current_path.lock().await;
+                            *path_guard = normalized_path;
+
+                            Ok(CommandResult {
+                                success: true,
+                                data: Some(items),
+                                error: None,
+                            })
+                        },
+                        Err(e) => {
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to list SFTP directory: {}", e)),
+                            })
+                        }
                     }
+                },
+                Err(e) => {
+                    Ok(CommandResult {
+                        success: false,
+                        data: None,
+                        error: Some(format!("Failed to connect SFTP for listing: {}", e)),
+                    })
                 }
-                
-                let mut path_guard = state.current_path.lock().await;
-                *path_guard = normalized_path;
+            }
+        }
+        Some(ConnectionProtocol::FTP) | None => {
+            if let Err(e) = get_or_reconnect_stream(&state).await {
+                return Ok(CommandResult {
+                    success: false,
+                    data: None,
+                    error: Some(e),
+                });
+            }
+            
+            let mut client_guard = state.ftp_client.lock().await;
+            
+            if let Some(stream) = client_guard.as_mut() {
+                match stream.mlsd(Some(&normalized_path)).await {
+                    Ok(files) => {
+                        let mut items = Vec::new();
+                        for file_str in &files {
+                            if let Some((name, size, is_directory, date_str, permissions)) = parse_ftp_list_line(file_str) {
+                                 let full_path = if normalized_path == "/" { format!("/{}", name) } else { format!("{}/{}", normalized_path.trim_end_matches('/'), name) };
+                                 let size = if is_directory {
+                                     0
+                                 } else {
+                                     size
+                                 };
 
-                Ok(CommandResult {
-                    success: true,
-                    data: Some(items),
-                    error: None,
-                })
-            },
-            Err(e) => {
-                drop(client_guard);
-                
-                if get_or_reconnect_stream(&state).await.is_ok() {
-                    let mut retry_guard = state.client.lock().await;
-                    if let Some(retry_stream) = retry_guard.as_mut() {
-                        match retry_stream.mlsd(Some(&normalized_path)).await {
-                            Ok(files) => {
-                                let mut items = Vec::new();
-                                for file_str in files {
-                                    if let Some((name, size, is_directory, date_str, permissions)) = parse_ftp_list_line(&file_str) {
-                                         items.push(FileItem {
-                                            name: name.clone(),
-                                            full_path: if normalized_path == "/" { format!("/{}", name) } else { format!("{}/{}", normalized_path.trim_end_matches('/'), name) }, 
-                                            size,
-                                            modified: None,
-                                            is_directory,
-                                            readable_size: if is_directory { "".to_string() } else { format_bytes(size) },
-                                            readable_modified: date_str,
-                                            permissions,
-                                        });
-                                    }
-                                }
-                                
-                                let mut path_guard = state.current_path.lock().await;
-                                *path_guard = normalized_path;
+                                 let readable_size = if is_directory {
+                                     "".to_string()
+                                 } else {
+                                     format_bytes(size)
+                                 };
 
-                                return Ok(CommandResult {
-                                    success: true,
-                                    data: Some(items),
-                                    error: None,
-                                });
-                            },
-                            Err(retry_err) => {
-                                return Ok(CommandResult {
-                                    success: false,
-                                    data: None,
-                                    error: Some(format!("Failed after reconnect: {}", retry_err)),
+                                 items.push(FileItem {
+                                    name: name.clone(),
+                                    full_path, 
+                                    size,
+                                    modified: None,
+                                    is_directory,
+                                    readable_size,
+                                    readable_modified: date_str,
+                                    permissions,
                                 });
                             }
                         }
+                        
+                        let mut path_guard = state.current_path.lock().await;
+                        *path_guard = normalized_path;
+
+                        Ok(CommandResult {
+                            success: true,
+                            data: Some(items),
+                            error: None,
+                        })
+                    },
+                    Err(e) => {
+                        drop(client_guard);
+                        
+                        if get_or_reconnect_stream(&state).await.is_ok() {
+                            let mut retry_guard = state.ftp_client.lock().await;
+                            if let Some(retry_stream) = retry_guard.as_mut() {
+                                match retry_stream.mlsd(Some(&normalized_path)).await {
+                                    Ok(files) => {
+                                        let mut items = Vec::new();
+                                        for file_str in &files {
+                                            if let Some((name, size, is_directory, date_str, permissions)) = parse_ftp_list_line(file_str) {
+                                                 let full_path = if normalized_path == "/" { format!("/{}", name) } else { format!("{}/{}", normalized_path.trim_end_matches('/'), name) };
+                                                 let size = if is_directory {
+                                                     0
+                                                 } else {
+                                                     size
+                                                 };
+
+                                                 let readable_size = if is_directory {
+                                                     "".to_string()
+                                                 } else {
+                                                     format_bytes(size)
+                                                 };
+
+                                                 items.push(FileItem {
+                                                    name: name.clone(),
+                                                    full_path, 
+                                                    size,
+                                                    modified: None,
+                                                    is_directory,
+                                                    readable_size,
+                                                    readable_modified: date_str,
+                                                    permissions,
+                                                });
+                                            }
+                                        }
+                                        
+                                        let mut path_guard = state.current_path.lock().await;
+                                        *path_guard = normalized_path;
+
+                                        return Ok(CommandResult {
+                                            success: true,
+                                            data: Some(items),
+                                            error: None,
+                                        });
+                                    },
+                                    Err(retry_err) => {
+                                        return Ok(CommandResult {
+                                            success: false,
+                                            data: None,
+                                            error: Some(format!("Failed after reconnect: {}", retry_err)),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Ok(CommandResult {
+                            success: false,
+                            data: None,
+                            error: Some(format!("Failed to list directory via MLSD: {}", e)),
+                        })
                     }
                 }
-                
+            } else {
                 Ok(CommandResult {
                     success: false,
                     data: None,
-                    error: Some(format!("Failed to list directory via MLSD: {}", e)),
+                    error: Some("Not connected".to_string()),
                 })
             }
         }
-    } else {
-        Ok(CommandResult {
-            success: false,
-            data: None,
-            error: Some("Not connected".to_string()),
-        })
     }
 }
+
 
 #[tauri::command]
 pub async fn list_local_files(path: String) -> Result<CommandResult<Vec<FileItem>>, String> {
@@ -126,14 +194,26 @@ pub async fn list_local_files(path: String) -> Result<CommandResult<Vec<FileItem
                 for entry in entries {
                     if let Ok(entry) = entry {
                         let metadata = entry.metadata().ok();
-                        let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
                         let is_dir = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        let full_path = entry.path().to_string_lossy().to_string();
+
+                        let size = if is_dir {
+                            0
+                        } else {
+                            let s = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+                            s
+                        };
+                        
+                        let readable_size = if is_dir {
+                            "".to_string()
+                        } else {
+                            format_bytes(size)
+                        };
+
                         let modified: Option<DateTime<Utc>> = metadata
                             .and_then(|m| m.modified().ok())
                             .map(|t| t.into());
-                        
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        let full_path = entry.path().to_string_lossy().to_string();
                         
                         let permissions = if is_dir { "drwxrwxrwx".to_string() } else { "-rw-rw-rw-".to_string() };
 
@@ -143,7 +223,7 @@ pub async fn list_local_files(path: String) -> Result<CommandResult<Vec<FileItem
                             size,
                             modified,
                             is_directory: is_dir,
-                            readable_size: if is_dir { "".to_string() } else { format_bytes(size) },
+                            readable_size,
                             readable_modified: modified.map(|d| d.format("%Y-%m-%d %H:%M").to_string()).unwrap_or_default(),
                             permissions,
                         });

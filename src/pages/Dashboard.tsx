@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { listen } from '@tauri-apps/api/event';
-import { ftp, FileItem } from "../utils/api";
+import { ftp, FileItem, isExecutableForEditor } from "../utils/api";
 
 import { useToasts } from "../hooks/useToasts";
 import { useFileSystem } from "../hooks/useFileSystem";
@@ -34,6 +34,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
         localFiles, remoteFiles,
         recentFolders,
         localLoading, remoteLoading,
+        setLocalLoading, setRemoteLoading,
         localBreadcrumbs, remoteBreadcrumbs,
         loadLocal, loadRemote,
         navigateLocalUp, navigateRemoteUp,
@@ -51,6 +52,11 @@ export function Dashboard({ onLogout }: DashboardProps) {
         const audioExtensions = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'wma', 'opus'];
 
         if (ext && audioExtensions.includes(ext)) {
+            return;
+        }
+
+        // Prevent opening executables in Monaco editor
+        if (!isRemote && isExecutableForEditor(file.name)) {
             return;
         }
 
@@ -101,7 +107,11 @@ export function Dashboard({ onLogout }: DashboardProps) {
         completeTransfer,
         simulateProgress,
         currentTransferIdRef
-    });
+    }, setLocalLoading, setRemoteLoading);
+
+    const handleRunExecutable = useCallback((file: FileItem, isRemote: boolean) => {
+        handleFileAction('run', file, isRemote);
+    }, [handleFileAction]);
 
     const [selectedLocalPaths, setSelectedLocalPaths] = useState<Set<string>>(new Set());
     const [selectedRemotePaths, setSelectedRemotePaths] = useState<Set<string>>(new Set());
@@ -156,26 +166,42 @@ export function Dashboard({ onLogout }: DashboardProps) {
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setSidebarOpen(false);
+            if (e.key === 'Escape') {
+                setSidebarOpen(false);
+                
+                // Закрываем все диалоги
+                if (showRenameDialog) setShowRenameDialog(null);
+                if (showDeleteDialog) setShowDeleteDialog(null);
+                if (showCreateDialog) setShowCreateDialog(null);
+                if (showPropertiesDialog) setShowPropertiesDialog(null);
+                if (editingFile) setEditingFile(null);
+            }
         };
+        
+        const handleEnter = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                const isDialogOpen = !!(showRenameDialog || showDeleteDialog || showCreateDialog);
+                if (isDialogOpen) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (showRenameDialog) {
+                        handleConfirmRename();
+                    } else if (showDeleteDialog) {
+                        handleConfirmDelete();
+                    } else if (showCreateDialog) {
+                        handleConfirmCreate();
+                    }
+                }
+            }
+        };
+        
         window.addEventListener('keydown', handleEscape);
-        return () => window.removeEventListener('keydown', handleEscape);
-    }, []);
-
-    useKeybindings({
-        activePane,
-        selectedLocalPaths,
-        selectedRemotePaths,
-        localFiles,
-        remoteFiles,
-        setSelectedLocalPaths,
-        setSelectedRemotePaths,
-        setShowDeleteDialog,
-        handleFileAction,
-        undoRename,
-        goBack,
-        goForward
-    });
+        window.addEventListener('keydown', handleEnter, true);
+        return () => {
+            window.removeEventListener('keydown', handleEscape);
+            window.removeEventListener('keydown', handleEnter, true);
+        };
+    }, [showRenameDialog, showDeleteDialog, showCreateDialog, showPropertiesDialog, editingFile, handleConfirmRename, handleConfirmDelete, handleConfirmCreate]);
 
     const handleDisconnect = async () => {
         try {
@@ -184,6 +210,33 @@ export function Dashboard({ onLogout }: DashboardProps) {
         } catch (e) {
         }
     };
+
+    useKeybindings({
+        activePane,
+        setActivePane,
+        selectedLocalPaths,
+        selectedRemotePaths,
+        localFiles,
+        remoteFiles,
+        setSelectedLocalPaths,
+        setSelectedRemotePaths,
+        setShowDeleteDialog,
+        setShowCreateDialog,
+        handleFileAction,
+        handleFileOpen,
+        undoRename,
+        goBack,
+        goForward,
+        loadLocal,
+        loadRemote,
+        localPath,
+        remotePath,
+        navigateLocalUp,
+        navigateRemoteUp,
+        onDisconnect: handleDisconnect,
+        toggleSidebar: () => setSidebarOpen(prev => !prev),
+        addToast
+    });
 
     return (
         <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden bg-solid-bg select-none">
@@ -275,11 +328,12 @@ export function Dashboard({ onLogout }: DashboardProps) {
                     <Pane
                         paneId="local"
                         isActiveMobile={mobileActivePane === 'local'}
+                        isActive={activePane === 'local'}
                         title="Local Files"
                         path={localPath}
                         breadcrumbs={localBreadcrumbs}
                         files={localFiles}
-                        loading={localLoading}
+                        loading={!!localLoading}
                         selectedPaths={selectedLocalPaths}
                         onNavigate={loadLocal}
                         onNavigateUp={navigateLocalUp}
@@ -293,6 +347,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
                         onEmptyContextMenu={onEmptyContextMenu}
                         onMouseDown={handleMouseDown}
                         onFileOpen={handleFileOpen}
+                        onRunExecutable={handleRunExecutable}
                         sidebarOpen={sidebarOpen}
                         setSidebarOpen={setSidebarOpen}
                         setMobileActivePane={setMobileActivePane}
@@ -303,11 +358,12 @@ export function Dashboard({ onLogout }: DashboardProps) {
                     <Pane
                         paneId="remote"
                         isActiveMobile={mobileActivePane === 'remote'}
+                        isActive={activePane === 'remote'}
                         title="Remote Files"
                         path={remotePath}
                         breadcrumbs={remoteBreadcrumbs}
                         files={remoteFiles}
-                        loading={remoteLoading}
+                        loading={!!remoteLoading}
                         selectedPaths={selectedRemotePaths}
                         onNavigate={loadRemote}
                         onNavigateUp={navigateRemoteUp}
@@ -321,6 +377,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
                         onEmptyContextMenu={onEmptyContextMenu}
                         onMouseDown={handleMouseDown}
                         onFileOpen={handleFileOpen}
+                        onRunExecutable={handleRunExecutable}
                         setMobileActivePane={setMobileActivePane}
                         isDragging={dragState.isDragging}
                         dragTargetPane={dragState.targetPane}

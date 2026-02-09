@@ -1,3 +1,5 @@
+pub mod sftp_helper;
+
 use crate::models::FtpState;
 use crate::reconnect::{reconnect_with_retry, is_connection_alive};
 
@@ -36,27 +38,37 @@ pub fn normalize_remote_path(path: &str) -> String {
 }
 
 pub async fn get_or_reconnect_stream(state: &FtpState) -> Result<(), String> {
-    let mut client_guard = state.client.lock().await;
-    if let Some(stream) = client_guard.as_mut() {
-        if is_connection_alive(stream).await {
-            return Ok(());
-        }
-        let _ = client_guard.take();
-    }
-    
     let conn_info_guard = state.connection_info.lock().await;
-    if let Some(conn_info) = conn_info_guard.as_ref() {
-        let conn_info_clone = conn_info.clone();
-        drop(conn_info_guard);
-        
-        match reconnect_with_retry(&conn_info_clone, 3).await {
-            Ok(new_stream) => {
-                *client_guard = Some(new_stream);
-                Ok(())
+    let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+    let conn_info_clone = conn_info_guard.as_ref().cloned();
+    drop(conn_info_guard);
+
+    match protocol {
+        Some(crate::models::ConnectionProtocol::SFTP) => {
+            Ok(())
+        },
+        _ => {
+            let mut client_guard = state.ftp_client.lock().await;
+            if let Some(stream) = client_guard.as_mut() {
+                if is_connection_alive(stream).await {
+                    return Ok(());
+                }
+                let _ = client_guard.take();
             }
-            Err(e) => Err(format!("Auto-reconnect failed: {}", e))
+            
+            if let Some(conn_info) = conn_info_clone {
+                match reconnect_with_retry(&conn_info, 3).await {
+                    Ok(new_stream) => {
+                        *client_guard = Some(new_stream);
+                        Ok(())
+                    }
+                    Err(e) => Err(format!("Auto-reconnect failed: {}", e))
+                }
+            } else {
+                Err("Not connected and no connection info available".to_string())
+            }
         }
-    } else {
-        Err("Not connected and no connection info available".to_string())
     }
 }
+
+pub use sftp_helper::*;

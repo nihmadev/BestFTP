@@ -31,20 +31,68 @@ export const isExecutable = (filename: string) => {
     const isMac = ua.includes('mac');
 
     if (isWindows) {
-        return ['exe', 'msi', 'bat', 'cmd', 'html', 'htm'].includes(ext || '');
+        return ['exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'jar', 'wsf', 'vbs', 'js', 'ps1', 'html', 'htm'].includes(ext || '');
     }
     if (isLinux) {
-        return ['sh', 'run', 'bin', 'html', 'htm'].includes(ext || '') || filename.toLowerCase().includes('.appimage');
+        return ['run', 'bin', 'jar', 'py', 'pl', 'rb'].includes(ext || '') || 
+               filename.toLowerCase().includes('.appimage') ||
+               filename.toLowerCase().includes('.deb') ||
+               filename.toLowerCase().includes('.rpm');
     }
     if (isMac) {
-        return ['app', 'command', 'pkg', 'html', 'htm'].includes(ext || '');
+        return ['app', 'command', 'pkg', 'jar', 'py', 'pl', 'rb'].includes(ext || '') ||
+               filename.toLowerCase().includes('.dmg') ||
+               filename.toLowerCase().includes('.dep');
     }
-    return ['exe', 'msi', 'bat', 'cmd', 'sh', 'run', 'bin', 'app', 'command', 'pkg', 'html', 'htm'].includes(ext || '') || filename.toLowerCase().includes('.appimage');
+    return ['exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'jar', 'wsf', 'vbs', 'js', 'ps1', 'html', 'htm', 
+            'run', 'bin', 'app', 'command', 'pkg', 'py', 'pl', 'rb'].includes(ext || '') || 
+           filename.toLowerCase().includes('.appimage') ||
+           filename.toLowerCase().includes('.dmg') ||
+           filename.toLowerCase().includes('.deb') ||
+           filename.toLowerCase().includes('.rpm') ||
+           filename.toLowerCase().includes('.dep');
+};
+
+export const isExecutableForEditor = (filename: string) => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isWindows = ua.includes('win');
+    const isLinux = ua.includes('linux');
+    const isMac = ua.includes('mac');
+    const shellScriptExts = ['sh', 'bash', 'zsh', 'fish', 'csh', 'tcsh', 'ksh'];
+    if (shellScriptExts.includes(ext || '')) {
+        return false;
+    }
+
+    if (isWindows) {
+        return ['exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'jar', 'wsf', 'vbs', 'js', 'ps1', 'html', 'htm'].includes(ext || '');
+    }
+    if (isLinux) {
+        return ['run', 'bin', 'jar', 'py', 'pl', 'rb'].includes(ext || '') || 
+               filename.toLowerCase().includes('.appimage') ||
+               filename.toLowerCase().includes('.deb') ||
+               filename.toLowerCase().includes('.rpm');
+    }
+    if (isMac) {
+        return ['app', 'command', 'pkg', 'jar', 'py', 'pl', 'rb'].includes(ext || '') ||
+               filename.toLowerCase().includes('.dmg') ||
+               filename.toLowerCase().includes('.dep');
+    }
+    return ['exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'jar', 'wsf', 'vbs', 'js', 'ps1', 
+            'run', 'bin', 'app', 'command', 'pkg', 'py', 'pl', 'rb'].includes(ext || '') || 
+           filename.toLowerCase().includes('.appimage') ||
+           filename.toLowerCase().includes('.dmg') ||
+           filename.toLowerCase().includes('.deb') ||
+           filename.toLowerCase().includes('.rpm') ||
+           filename.toLowerCase().includes('.dep');
 };
 
 export const ftp = {
-    connect: (host: string, port: number, username?: string, password?: string) =>
-        invoke<CommandResult<string>>("connect", { host, port, username, password }),
+    connect: (host: string, port: number, username?: string, password?: string, protocol?: string) =>
+        invoke<CommandResult<string>>("connect", { host, port, username, password, protocol }),
+
+    connect_auto: (host: string, port: number, username?: string, password?: string) =>
+        invoke<CommandResult<string>>("connect_auto", { host, port, username, password }),
 
     disconnect: () => invoke<void>("disconnect"),
 
@@ -53,6 +101,9 @@ export const ftp = {
 
     listLocalFiles: (path: string) =>
         invoke<CommandResult<FileItem[]>>("list_local_files", { path }),
+
+    searchFiles: (path: string, query: string, isRemote: boolean, recursive: boolean) =>
+        invoke<CommandResult<FileItem[]>>("search_files", { path, query, isRemote, recursive }),
 
     getInitialLocalPath: () => invoke<string>("get_initial_local_path"),
 
@@ -92,8 +143,6 @@ export const ftp = {
 
     runExecutable: (path: string, isRemote: boolean) =>
         invoke<CommandResult<string>>("run_executable", { path, isRemote }),
-
-    // Event listeners for progress tracking
     onUploadProgress: (callback: (event: { payload: any }) => void) =>
         listen("upload-progress", callback),
 

@@ -14,7 +14,9 @@ export function useFileOperations(
         completeTransfer: (id: string, success: boolean, error?: string) => void;
         simulateProgress: (id: string, durationMs?: number) => () => void;
         currentTransferIdRef: React.MutableRefObject<string | null>;
-    }
+    },
+    setLocalLoading?: (loading: boolean | string) => void,
+    setRemoteLoading?: (loading: boolean | string) => void
 ) {
     const [showRenameDialog, setShowRenameDialog] = useState<{ file: FileItem, isRemote: boolean } | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState<{ files: FileItem[], isRemote: boolean } | null>(null);
@@ -33,6 +35,13 @@ export function useFileOperations(
         const currentPath = isRemote ? remotePath : localPath;
         const separator = isRemote ? '/' : '\\';
         const fullPath = `${currentPath.replace(/[\\/]$/, '')}${separator}${newName}`;
+        setShowCreateDialog(null);
+        const nameToCreate = newName;
+        setNewName("");
+
+        const setLoading = isRemote ? setRemoteLoading : setLocalLoading;
+        if (setLoading) setLoading(`Creating ${type === 'file' ? 'file' : 'directory'} ${nameToCreate}...`);
+        else addToast(`Creating ${type === 'file' ? 'file' : 'directory'} ${nameToCreate}...`, 'info');
 
         try {
             let result;
@@ -61,10 +70,9 @@ export function useFileOperations(
         } catch (e) {
             addToast(String(e), 'error');
         } finally {
-            setShowCreateDialog(null);
-            setNewName("");
+            if (setLoading) setLoading(false);
         }
-    }, [showCreateDialog, newName, localPath, remotePath, loadLocal, loadRemote, addToast]);
+    }, [showCreateDialog, newName, localPath, remotePath, loadLocal, loadRemote, addToast, setLocalLoading, setRemoteLoading]);
 
     const handleConfirmRename = useCallback(async () => {
         if (!showRenameDialog || !newName || newName === showRenameDialog.file.name) {
@@ -76,11 +84,18 @@ export function useFileOperations(
         const parentPath = file.full_path.substring(0, file.full_path.lastIndexOf(isRemote ? '/' : '\\'));
         const separator = isRemote ? '/' : '\\';
         const newPath = `${parentPath}${separator}${newName}`;
+        setShowRenameDialog(null);
+        const nameToRename = newName;
+        setNewName("");
+
+        const setLoading = isRemote ? setRemoteLoading : setLocalLoading;
+        if (setLoading) setLoading(`Renaming to ${nameToRename}...`);
+        else addToast(`Renaming to ${nameToRename}...`, 'info');
 
         try {
             const result = await ftp.renameFile(file.full_path, newPath, isRemote);
             if (result.success) {
-                addToast(`Renamed to ${newName}`, 'success');
+                addToast(`Renamed to ${nameToRename}`, 'success');
                 setLastAction({ type: 'rename', oldPath: file.full_path, newPath: newPath, isRemote });
                 if (isRemote) loadRemote(remotePath);
                 else loadLocal(localPath);
@@ -90,14 +105,20 @@ export function useFileOperations(
         } catch (e) {
             addToast(String(e), 'error');
         } finally {
-            setShowRenameDialog(null);
+            if (setLoading) setLoading(false);
         }
-    }, [showRenameDialog, newName, localPath, remotePath, loadLocal, loadRemote, addToast]);
+    }, [showRenameDialog, newName, localPath, remotePath, loadLocal, loadRemote, addToast, setLocalLoading, setRemoteLoading]);
 
     const handleConfirmDelete = useCallback(async () => {
         if (!showDeleteDialog) return;
 
         const { files, isRemote } = showDeleteDialog;
+        setShowDeleteDialog(null);
+
+        const setLoading = isRemote ? setRemoteLoading : setLocalLoading;
+        if (setLoading) setLoading(`Deleting ${files.length} item(s)...`);
+        else addToast(`Deleting ${files.length} item(s)...`, 'info');
+
         let successCount = 0;
         let errors = [];
 
@@ -142,12 +163,16 @@ export function useFileOperations(
         if (errors.length > 0) {
             addToast(`Failed to delete ${errors.length} item(s)`, 'error');
         }
-
-        setShowDeleteDialog(null);
     }, [showDeleteDialog, localPath, remotePath, loadLocal, loadRemote, addToast, transferQueue]);
 
-    const handleFileAction = useCallback(async (action: 'open' | 'download' | 'delete' | 'rename' | 'properties' | 'move' | 'run', file: FileItem, isRemote: boolean) => {
+    const handleFileAction = useCallback(async (action: 'open' | 'download' | 'delete' | 'rename' | 'properties' | 'move' | 'run' | 'copy_local', file: FileItem, isRemote: boolean) => {
         switch (action) {
+            case 'copy_local':
+                if (!isRemote) {
+                    // separator unused; removed to fix lint warning
+                    // const parentPath = file.full_path.substring(0, file.full_path.lastIndexOf(separator));
+                }
+                break;
             case 'open':
                 if (file.is_directory) {
                     if (isRemote) loadRemote(file.full_path);

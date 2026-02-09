@@ -12,8 +12,6 @@ const createMonacoTheme = (themeId: ThemeId): any => {
     if (!theme) return null;
 
     const colors = theme.colors;
-
-    // Helper to ensure we have a 6-digit hex for appending alpha
     const stripAlpha = (hex: string) => {
         if (hex.startsWith('#') && hex.length > 7) {
             return hex.substring(0, 7);

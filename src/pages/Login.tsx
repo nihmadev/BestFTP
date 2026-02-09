@@ -12,6 +12,7 @@ interface SavedCredential {
     port: number;
     username: string;
     password?: string;
+    protocol: string;
     lastUsed: number;
 }
 
@@ -23,6 +24,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
     const [saveCreds, setSaveCreds] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
     const [isVerySmall, setIsVerySmall] = useState(false);
 
     const [savedCreds, setSavedCreds] = useState<SavedCredential[]>([]);
@@ -64,7 +66,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
         }
 
         try {
-            const result = await ftp.connect(host, port, username || undefined, password || undefined);
+            const result = await ftp.connect_auto(host, port, username || undefined, password || undefined);
 
             if (result.success) {
                 if (saveCreds) {
@@ -73,6 +75,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
                         port,
                         username,
                         password,
+                        protocol: "auto", // Auto-detected
                         lastUsed: Date.now(),
                     };
 

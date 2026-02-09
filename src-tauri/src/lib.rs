@@ -2,6 +2,7 @@ mod models;
 mod utils;
 mod commands;
 mod reconnect;
+mod sftp_ops;
 
 use crate::models::FtpState;
 use crate::commands::*;
@@ -14,6 +15,7 @@ pub fn run() {
         .manage(FtpState::default())
         .invoke_handler(tauri::generate_handler![
             connect, 
+            connect_auto,
             disconnect, 
             list_remote_files,
             list_local_files,
@@ -25,6 +27,7 @@ pub fn run() {
             upload_file,
             download_file,
             move_file,
+            search_files,
             create_directory,
             create_file,
             read_text_file,

@@ -1,9 +1,10 @@
 use tauri::{AppHandle, State, Emitter};
 use std::path::Path;
 use suppaftp::AsyncFtpStream;
-use crate::models::{FtpState, CommandResult};
+use crate::models::{FtpState, CommandResult, ConnectionProtocol};
 use crate::utils::parse_ftp_list_line;
 use crate::commands::common::{normalize_remote_path, get_or_reconnect_stream};
+use crate::sftp_ops::SftpClient;
 use futures_lite::io::Cursor as AsyncCursor;
 
 #[derive(Clone, serde::Serialize)]
@@ -123,69 +124,127 @@ pub async fn delete_file(
     if is_remote {
         let normalized_path = normalize_remote_path(&path);
         eprintln!("Attempting to delete remote file: {} -> {}", path, normalized_path);
+        let conn_info_guard = state.connection_info.lock().await;
+        let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+        drop(conn_info_guard);
         
-        if let Err(e) = get_or_reconnect_stream(&state).await {
-            eprintln!("Reconnect failed: {}", e);
-            return Ok(CommandResult {
-                success: false,
-                data: None,
-                error: Some(e),
-            });
-        }
-        
-        let mut client_guard = state.client.lock().await;
-        if let Some(stream) = client_guard.as_mut() {
-            let total_items = match count_remote_items(stream, &normalized_path).await {
-                Ok(count) => count,
-                Err(e) => {
+        match protocol {
+            Some(ConnectionProtocol::SFTP) => {
+                let conn_info = state.connection_info.lock().await;
+                if let Some(ref conn) = *conn_info {
+                    let host = conn.host.clone();
+                    let port = conn.port;
+                    let username = conn.username.clone();
+                    let password = conn.password.clone();
+                    drop(conn_info);
+                    
+                    match SftpClient::connect(&host, port, &username, &password) {
+                        Ok(sftp_client) => {
+                            let path_obj = Path::new(&normalized_path);
+                            let result = if path_obj.is_dir() {
+                                match sftp_client.remove_directory(&normalized_path) {
+                                    Ok(_) => Ok(()),
+                                    Err(e) => Err(format!("Failed to remove SFTP directory: {}", e))
+                                }
+                            } else {
+                                match sftp_client.remove_file(&normalized_path) {
+                                    Ok(_) => Ok(()),
+                                    Err(e) => Err(format!("Failed to remove SFTP file: {}", e))
+                                }
+                            };
+                            
+                            match result {
+                                Ok(_) => {
+                                    eprintln!("SFTP Delete successful for: {}", normalized_path);
+                                    Ok(CommandResult { success: true, data: None, error: None })
+                                },
+                                Err(e) => {
+                                    eprintln!("SFTP Delete failed for {}: {}", normalized_path, e);
+                                    Ok(CommandResult {
+                                        success: false,
+                                        data: None,
+                                        error: Some(e),
+                                    })
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to connect SFTP for deletion: {}", e)),
+                            })
+                        }
+                    }
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("No connection info available".to_string()) })
+                }
+            }
+            Some(ConnectionProtocol::FTP) | None => {
+                if let Err(e) = get_or_reconnect_stream(&state).await {
+                    eprintln!("Reconnect failed: {}", e);
                     return Ok(CommandResult {
                         success: false,
                         data: None,
-                        error: Some(format!("Failed to count items: {}", e)),
+                        error: Some(e),
                     });
                 }
-            };
+                
+                let mut client_guard = state.ftp_client.lock().await;
+                if let Some(stream) = client_guard.as_mut() {
+                    let total_items = match count_remote_items(stream, &normalized_path).await {
+                        Ok(count) => count,
+                        Err(e) => {
+                            return Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to count items: {}", e)),
+                            });
+                        }
+                    };
 
-            let file_name = normalized_path.split('/').last().unwrap_or("unknown").to_string();
-            let mut deleted_items = 0u32;
+                    let file_name = normalized_path.split('/').last().unwrap_or("unknown").to_string();
+                    let mut deleted_items = 0u32;
 
-            match delete_remote_recursive(stream, &normalized_path, &app, file_name.clone(), total_items, &mut deleted_items).await {
-                Ok(_) => {
-                    eprintln!("Delete successful for: {}", normalized_path);
-                    Ok(CommandResult { success: true, data: None, error: None })
-                },
-                Err(e) => {
-                    eprintln!("Delete failed for {}: {}", normalized_path, e);
-                    drop(client_guard);
-                    
-                    if get_or_reconnect_stream(&state).await.is_ok() {
-                        let mut retry_guard = state.client.lock().await;
-                        if let Some(retry_stream) = retry_guard.as_mut() {
-                            let mut retry_deleted_items = 0u32;
-                            match delete_remote_recursive(retry_stream, &normalized_path, &app, file_name.clone(), total_items, &mut retry_deleted_items).await {
-                                Ok(_) => {
-                                    return Ok(CommandResult { success: true, data: None, error: None });
-                                },
-                                Err(retry_err) => {
-                                    return Ok(CommandResult {
-                                        success: false,
-                                        data: None,
-                                        error: Some(format!("Failed to delete after reconnect: {}", retry_err)),
-                                    });
+                    match delete_remote_recursive(stream, &normalized_path, &app, file_name.clone(), total_items, &mut deleted_items).await {
+                        Ok(_) => {
+                            eprintln!("Delete successful for: {}", normalized_path);
+                            Ok(CommandResult { success: true, data: None, error: None })
+                        },
+                        Err(e) => {
+                            eprintln!("Delete failed for {}: {}", normalized_path, e);
+                            drop(client_guard);
+                            
+                            if get_or_reconnect_stream(&state).await.is_ok() {
+                                let mut retry_guard = state.ftp_client.lock().await;
+                                if let Some(retry_stream) = retry_guard.as_mut() {
+                                    let mut retry_deleted_items = 0u32;
+                                    match delete_remote_recursive(retry_stream, &normalized_path, &app, file_name.clone(), total_items, &mut retry_deleted_items).await {
+                                        Ok(_) => {
+                                            return Ok(CommandResult { success: true, data: None, error: None });
+                                        },
+                                        Err(retry_err) => {
+                                            return Ok(CommandResult {
+                                                success: false,
+                                                data: None,
+                                                error: Some(format!("Failed to delete after reconnect: {}", retry_err)),
+                                            });
+                                        }
+                                    }
                                 }
                             }
-                        }
+                            
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to delete remote item: {}", e)),
+                            })
+                        },
                     }
-                    
-                    Ok(CommandResult {
-                        success: false,
-                        data: None,
-                        error: Some(format!("Failed to delete remote item: {}", e)),
-                    })
-                },
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+                }
             }
-        } else {
-            Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
         }
     } else {
         let result = tokio::task::spawn_blocking(move || {
@@ -214,49 +273,88 @@ pub async fn rename_file(
     if is_remote {
         let normalized_old_path = normalize_remote_path(&old_path);
         let normalized_new_path = normalize_remote_path(&new_path);
+        let conn_info_guard = state.connection_info.lock().await;
+        let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+        drop(conn_info_guard);
         
-        if let Err(e) = get_or_reconnect_stream(&state).await {
-            return Ok(CommandResult {
-                success: false,
-                data: None,
-                error: Some(e),
-            });
-        }
-        
-        let mut client_guard = state.client.lock().await;
-        if let Some(stream) = client_guard.as_mut() {
-            match stream.rename(&normalized_old_path, &normalized_new_path).await {
-                Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
-                Err(e) => {
-                    drop(client_guard);
+        match protocol {
+            Some(ConnectionProtocol::SFTP) => {
+                let conn_info = state.connection_info.lock().await;
+                if let Some(ref conn) = *conn_info {
+                    let host = conn.host.clone();
+                    let port = conn.port;
+                    let username = conn.username.clone();
+                    let password = conn.password.clone();
+                    drop(conn_info);
                     
-                    if get_or_reconnect_stream(&state).await.is_ok() {
-                        let mut retry_guard = state.client.lock().await;
-                        if let Some(retry_stream) = retry_guard.as_mut() {
-                            match retry_stream.rename(&normalized_old_path, &normalized_new_path).await {
-                                Ok(_) => {
-                                    return Ok(CommandResult { success: true, data: None, error: None });
-                                },
-                                Err(retry_err) => {
-                                    return Ok(CommandResult {
-                                        success: false,
-                                        data: None,
-                                        error: Some(format!("Failed to rename after reconnect: {}", retry_err)),
-                                    });
-                                }
+                    match SftpClient::connect(&host, port, &username, &password) {
+                        Ok(sftp_client) => {
+                            match sftp_client.rename_file(&normalized_old_path, &normalized_new_path) {
+                                Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                                Err(e) => Ok(CommandResult {
+                                    success: false,
+                                    data: None,
+                                    error: Some(format!("Failed to rename SFTP item: {}", e)),
+                                })
                             }
+                        },
+                        Err(e) => {
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to connect SFTP for rename: {}", e)),
+                            })
                         }
                     }
-                    
-                    Ok(CommandResult {
-                        success: false,
-                        data: None,
-                        error: Some(format!("Failed to rename remote item: {}", e)),
-                    })
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("No connection info available".to_string()) })
                 }
             }
-        } else {
-            Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+            Some(ConnectionProtocol::FTP) | None => {
+                if let Err(e) = get_or_reconnect_stream(&state).await {
+                    return Ok(CommandResult {
+                        success: false,
+                        data: None,
+                        error: Some(e),
+                    });
+                }
+                
+                let mut client_guard = state.ftp_client.lock().await;
+                if let Some(stream) = client_guard.as_mut() {
+                    match stream.rename(&normalized_old_path, &normalized_new_path).await {
+                        Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                        Err(e) => {
+                            drop(client_guard);
+                            
+                            if get_or_reconnect_stream(&state).await.is_ok() {
+                                let mut retry_guard = state.ftp_client.lock().await;
+                                if let Some(retry_stream) = retry_guard.as_mut() {
+                                    match retry_stream.rename(&normalized_old_path, &normalized_new_path).await {
+                                        Ok(_) => {
+                                            return Ok(CommandResult { success: true, data: None, error: None });
+                                        },
+                                        Err(retry_err) => {
+                                            return Ok(CommandResult {
+                                                success: false,
+                                                data: None,
+                                                error: Some(format!("Failed to rename after reconnect: {}", retry_err)),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to rename remote item: {}", e)),
+                            })
+                        }
+                    }
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+                }
+            }
         }
     } else {
         let result = tokio::task::spawn_blocking(move || {
@@ -278,49 +376,88 @@ pub async fn create_directory(
 ) -> Result<CommandResult<()>, String> {
     if is_remote {
         let normalized_path = normalize_remote_path(&path);
+        let conn_info_guard = state.connection_info.lock().await;
+        let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+        drop(conn_info_guard);
         
-        if let Err(e) = get_or_reconnect_stream(&state).await {
-            return Ok(CommandResult {
-                success: false,
-                data: None,
-                error: Some(e),
-            });
-        }
-        
-        let mut client_guard = state.client.lock().await;
-        if let Some(stream) = client_guard.as_mut() {
-            match stream.mkdir(&normalized_path).await {
-                Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
-                Err(e) => {
-                    drop(client_guard);
+        match protocol {
+            Some(ConnectionProtocol::SFTP) => {
+                let conn_info = state.connection_info.lock().await;
+                if let Some(ref conn) = *conn_info {
+                    let host = conn.host.clone();
+                    let port = conn.port;
+                    let username = conn.username.clone();
+                    let password = conn.password.clone();
+                    drop(conn_info);
                     
-                    if get_or_reconnect_stream(&state).await.is_ok() {
-                        let mut retry_guard = state.client.lock().await;
-                        if let Some(retry_stream) = retry_guard.as_mut() {
-                            match retry_stream.mkdir(&normalized_path).await {
-                                Ok(_) => {
-                                    return Ok(CommandResult { success: true, data: None, error: None });
-                                },
-                                Err(retry_err) => {
-                                    return Ok(CommandResult {
-                                        success: false,
-                                        data: None,
-                                        error: Some(format!("Failed to create directory after reconnect: {}", retry_err)),
-                                    });
-                                }
+                    match SftpClient::connect(&host, port, &username, &password) {
+                        Ok(sftp_client) => {
+                            match sftp_client.create_directory(&normalized_path) {
+                                Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                                Err(e) => Ok(CommandResult {
+                                    success: false,
+                                    data: None,
+                                    error: Some(format!("Failed to create SFTP directory: {}", e)),
+                                })
                             }
+                        },
+                        Err(e) => {
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to connect SFTP for directory creation: {}", e)),
+                            })
                         }
                     }
-                    
-                    Ok(CommandResult {
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("No connection info available".to_string()) })
+                }
+            }
+            Some(ConnectionProtocol::FTP) | None => {
+                if let Err(e) = get_or_reconnect_stream(&state).await {
+                    return Ok(CommandResult {
                         success: false,
                         data: None,
-                        error: Some(format!("Failed to create remote directory: {}", e)),
-                    })
-                },
+                        error: Some(e),
+                    });
+                }
+                
+                let mut client_guard = state.ftp_client.lock().await;
+                if let Some(stream) = client_guard.as_mut() {
+                    match stream.mkdir(&normalized_path).await {
+                        Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                        Err(e) => {
+                            drop(client_guard);
+                            
+                            if get_or_reconnect_stream(&state).await.is_ok() {
+                                let mut retry_guard = state.ftp_client.lock().await;
+                                if let Some(retry_stream) = retry_guard.as_mut() {
+                                    match retry_stream.mkdir(&normalized_path).await {
+                                        Ok(_) => {
+                                            return Ok(CommandResult { success: true, data: None, error: None });
+                                        },
+                                        Err(retry_err) => {
+                                            return Ok(CommandResult {
+                                                success: false,
+                                                data: None,
+                                                error: Some(format!("Failed to create directory after reconnect: {}", retry_err)),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to create remote directory: {}", e)),
+                            })
+                        },
+                    }
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+                }
             }
-        } else {
-            Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
         }
     } else {
         let result = tokio::task::spawn_blocking(move || {
@@ -341,52 +478,91 @@ pub async fn create_file(
     is_remote: bool,
 ) -> Result<CommandResult<()>, String> {
     if is_remote {
-        let normalized_path = normalize_remote_path(&path);
+        let normalized_path = normalize_remote_path(&path);    
+        let conn_info_guard = state.connection_info.lock().await;
+        let protocol = conn_info_guard.as_ref().map(|c| c.protocol.clone());
+        drop(conn_info_guard);
         
-        if let Err(e) = get_or_reconnect_stream(&state).await {
-            return Ok(CommandResult {
-                success: false,
-                data: None,
-                error: Some(e),
-            });
-        }
-        
-        let mut client_guard = state.client.lock().await;
-        if let Some(stream) = client_guard.as_mut() {
-            let mut cursor = AsyncCursor::new(Vec::new());
-            match stream.put_file(&normalized_path, &mut cursor).await {
-                Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
-                Err(e) => {
-                    drop(client_guard);
+        match protocol {
+            Some(ConnectionProtocol::SFTP) => {
+                let conn_info = state.connection_info.lock().await;
+                if let Some(ref conn) = *conn_info {
+                    let host = conn.host.clone();
+                    let port = conn.port;
+                    let username = conn.username.clone();
+                    let password = conn.password.clone();
+                    drop(conn_info);
                     
-                    if get_or_reconnect_stream(&state).await.is_ok() {
-                        let mut retry_guard = state.client.lock().await;
-                        if let Some(retry_stream) = retry_guard.as_mut() {
-                            let mut retry_cursor = AsyncCursor::new(Vec::new());
-                            match retry_stream.put_file(&normalized_path, &mut retry_cursor).await {
-                                Ok(_) => {
-                                    return Ok(CommandResult { success: true, data: None, error: None });
-                                },
-                                Err(retry_err) => {
-                                    return Ok(CommandResult {
-                                        success: false,
-                                        data: None,
-                                        error: Some(format!("Failed to create file after reconnect: {}", retry_err)),
-                                    });
-                                }
+                    match SftpClient::connect(&host, port, &username, &password) {
+                        Ok(sftp_client) => {
+                            match sftp_client.create_empty_file(&normalized_path) {
+                                Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                                Err(e) => Ok(CommandResult {
+                                    success: false,
+                                    data: None,
+                                    error: Some(format!("Failed to create SFTP file: {}", e)),
+                                })
                             }
+                        },
+                        Err(e) => {
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to connect SFTP for file creation: {}", e)),
+                            })
                         }
                     }
-                    
-                    Ok(CommandResult {
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("No connection info available".to_string()) })
+                }
+            }
+            Some(ConnectionProtocol::FTP) | None => {
+                if let Err(e) = get_or_reconnect_stream(&state).await {
+                    return Ok(CommandResult {
                         success: false,
                         data: None,
-                        error: Some(format!("Failed to create remote file: {}", e)),
-                    })
-                },
+                        error: Some(e),
+                    });
+                }
+                
+                let mut client_guard = state.ftp_client.lock().await;
+                if let Some(stream) = client_guard.as_mut() {
+                    let mut cursor = AsyncCursor::new(Vec::new());
+                    match stream.put_file(&normalized_path, &mut cursor).await {
+                        Ok(_) => Ok(CommandResult { success: true, data: None, error: None }),
+                        Err(e) => {
+                            drop(client_guard);
+                            
+                            if get_or_reconnect_stream(&state).await.is_ok() {
+                                let mut retry_guard = state.ftp_client.lock().await;
+                                if let Some(retry_stream) = retry_guard.as_mut() {
+                                    let mut retry_cursor = AsyncCursor::new(Vec::new());
+                                    match retry_stream.put_file(&normalized_path, &mut retry_cursor).await {
+                                        Ok(_) => {
+                                            return Ok(CommandResult { success: true, data: None, error: None });
+                                        },
+                                        Err(retry_err) => {
+                                            return Ok(CommandResult {
+                                                success: false,
+                                                data: None,
+                                                error: Some(format!("Failed to create file after reconnect: {}", retry_err)),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Ok(CommandResult {
+                                success: false,
+                                data: None,
+                                error: Some(format!("Failed to create remote file: {}", e)),
+                            })
+                        },
+                    }
+                } else {
+                    Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
+                }
             }
-        } else {
-            Ok(CommandResult { success: false, data: None, error: Some("Not connected".to_string()) })
         }
     } else {
         let result = tokio::task::spawn_blocking(move || {

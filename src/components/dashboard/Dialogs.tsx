@@ -140,14 +140,14 @@ export function DeleteDialog({ files, onConfirm, onCancel }: DeleteDialogProps) 
                     </p>
                     <div className="flex flex-col gap-1 max-h-[160px] overflow-y-auto pr-2 bg-control-alt/30 rounded-md p-2 border border-card-default/50">
                         {files.map((file, idx) => (
-                            <div key={idx} className="flex items-center gap-3 py-1.5 px-2 rounded-sm hover:bg-subtle-secondary transition-colors group">
+                            <div key={idx} className="flex items-center gap-3 py-1.5 px-2 rounded-sm group">
                                 <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
                                     {file.is_directory
                                         ? getFolderIcon(file.name, false, file.full_path)
                                         : getFileIcon(file.name, file.full_path)
                                     }
                                 </div>
-                                <span className="text-xs text-text-primary truncate font-medium group-hover:text-accent transition-colors">
+                                <span className="text-xs text-text-primary truncate font-medium">
                                     {file.name}
                                 </span>
                             </div>

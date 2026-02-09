@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useCallback, useEffect } from "react";
-import { FileItem, isExecutable } from "../../utils/api";
+import { FileItem, isExecutable, isExecutableForEditor } from "../../utils/api";
 import { getFileIcon, getFolderIcon } from "../../utils/fileIcons";
 import { Loader2 } from "lucide-react";
 
@@ -17,6 +17,7 @@ interface FileListProps {
     onEmptyContextMenu: (e: React.MouseEvent, isRemote: boolean) => void;
     onMouseDown: (e: React.MouseEvent, file: FileItem, isRemote: boolean) => void;
     onFileOpen: (file: FileItem, isRemote: boolean) => void;
+    onRunExecutable: (file: FileItem, isRemote: boolean) => void;
 }
 
 const FileRow = React.memo(({
@@ -82,7 +83,8 @@ export const FileList = React.memo(({
     onFileContextMenu,
     onEmptyContextMenu,
     onMouseDown,
-    onFileOpen
+    onFileOpen,
+    onRunExecutable
 }: FileListProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const selectedPathsRef = useRef(selectedPaths);
@@ -133,9 +135,19 @@ export const FileList = React.memo(({
                 onNavigate(file.full_path);
             }
         } else {
+            // Check if file is an executable that should be run instead of opened
+            if (!isRemote && isExecutable(file.name)) {
+                onRunExecutable(file, isRemote);
+                return;
+            }
+            // Check if file is an executable that should not be opened in editor
+            if (!isRemote && isExecutableForEditor(file.name)) {
+                // Don't open executables in Monaco editor - they should be run via Enter key or context menu
+                return;
+            }
             onFileOpen(file, isRemote);
         }
-    }, [isRemote, onNavigate, onFileOpen]);
+    }, [isRemote, onNavigate, onFileOpen, onRunExecutable]);
 
     const handleItemMouseDown = useCallback((e: React.MouseEvent, file: FileItem) => {
         if (e.button !== 0) return; // Left click only
@@ -292,7 +304,9 @@ export const FileList = React.memo(({
             {loading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-solid-bg/20 z-[5]">
                     <Loader2 size={56} className="animate-spin text-accent" />
-                    <div className="text-[13px] font-medium text-text-tertiary">Please wait a moment...</div>
+                    <div className="text-[13px] font-medium text-text-tertiary">
+                        {typeof loading === 'string' ? loading : "Please wait a moment..."}
+                    </div>
                 </div>
             ) : (
                 <div className="flex flex-col">

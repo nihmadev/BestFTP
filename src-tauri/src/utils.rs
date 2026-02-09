@@ -1,10 +1,25 @@
 pub fn format_bytes(bytes: u64) -> String {
     const SUFFIXES: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     if bytes == 0 { return "0 B".to_string(); }
-    let i = (bytes as f64).log(1024.0).floor() as usize;
-    let i = if i >= SUFFIXES.len() { SUFFIXES.len() - 1 } else { i };
-    let p = (bytes as f64) / 1024.0f64.powi(i as i32);
-    format!("{:.2} {}", p, SUFFIXES[i])
+    
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+    
+    while size >= 1024.0 && unit_index < SUFFIXES.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+    
+    if unit_index == 0 {
+        format!("{} {}", bytes, SUFFIXES[unit_index])
+    } else {
+        let formatted = if size >= 10.0 {
+            format!("{:.1} {}", size, SUFFIXES[unit_index])
+        } else {
+            format!("{:.2} {}", size, SUFFIXES[unit_index])
+        };
+        formatted
+    }
 }
 
 pub fn parse_ftp_list_line(line: &str) -> Option<(String, u64, bool, String, String)> {
@@ -29,7 +44,11 @@ pub fn parse_ftp_list_line(line: &str) -> Option<(String, u64, bool, String, Str
                             }
                         },
                         "size" => {
-                            temp_size = value.parse::<u64>().unwrap_or(0);
+                            let parsed_size = value.parse::<u64>().unwrap_or(0);
+                            if !temp_is_dir && parsed_size > 100 * 1024 * 1024 {
+                                println!("DEBUG: Large file detected in FTP: {} size: {}", name, parsed_size);
+                            }
+                            temp_size = parsed_size;
                         },
                         "modify" => {
                             if value.len() == 14 {

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use suppaftp::AsyncFtpStream;
+use ssh2::Session;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 
@@ -10,11 +11,20 @@ pub struct ConnectionInfo {
     pub port: u16,
     pub username: String,
     pub password: String,
+    pub protocol: ConnectionProtocol,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ConnectionProtocol {
+    FTP,
+    SFTP,
 }
 
 #[derive(Default)]
 pub struct FtpState {
-    pub client: Arc<Mutex<Option<AsyncFtpStream>>>,
+    pub ftp_client: Arc<Mutex<Option<AsyncFtpStream>>>,
+    pub sftp_session: Arc<Mutex<Option<Session>>>,
+    pub sftp_tcp: Arc<Mutex<Option<std::net::TcpStream>>>,
     pub current_path: Arc<Mutex<String>>,
     pub connection_info: Arc<Mutex<Option<ConnectionInfo>>>,
 }

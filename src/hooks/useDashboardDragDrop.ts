@@ -89,14 +89,10 @@ export const useDashboardDragDrop = (
             try {
                 startTransfer(id);
                 currentTransferIdRef.current = id;
-
-                // Start simulation for immediate visual feedback
                 const stopSimulation = simulateProgress(id, 3000);
 
                 if (isRemoteSource === isRemoteDest) {
                     const res = await ftp.renameFile(sourceFullPath, destFullPath, isRemoteSource);
-
-                    // Stop simulation when operation completes
                     stopSimulation();
 
                     if (res.success) {
@@ -111,8 +107,6 @@ export const useDashboardDragDrop = (
                 } else {
                     if (isRemoteSource && !isRemoteDest) {
                         const res = await ftp.downloadFile(sourceFullPath, destFullPath);
-
-                        // Stop simulation when operation completes
                         stopSimulation();
 
                         if (res.success) {
@@ -126,8 +120,6 @@ export const useDashboardDragDrop = (
                         }
                     } else {
                         const res = await ftp.uploadFile(sourceFullPath, destFullPath);
-
-                        // Stop simulation when operation completes
                         stopSimulation();
 
                         if (res.success) {

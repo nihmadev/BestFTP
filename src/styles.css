@@ -23,7 +23,7 @@
     --radius-medium: 8px;
     --radius-large: 12px;
 
-    --font-family-base: "Segoe UI Variable", "Segoe UI", sans-serif;
+    --font-family-base: "Segoe UI", system-ui, -apple-system, sans-serif;
 
     --spacing-titlebar: 32px;
 }
@@ -78,6 +78,7 @@
         padding: 0;
         user-select: none;
         -webkit-user-drag: none;
+        font-weight: 400 !important;
     }
 
     body {
@@ -93,6 +94,14 @@
     input,
     button {
         font-family: inherit;
+    }
+
+    strong, b {
+        font-weight: 400 !important;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 400 !important;
     }
 
     ::-webkit-scrollbar {
